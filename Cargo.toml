@@ -1,0 +1,31 @@
+[package]
+name = "sekkei"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.89.0"
+description = "Sekkei (設計) — canonical OpenAPI 3.0 serde types, multi-format loading, and ref resolution"
+homepage = "https://github.com/pleme-io/sekkei"
+repository = "https://github.com/pleme-io/sekkei"
+license = "MIT"
+categories = ["parsing", "web-programming"]
+keywords = ["openapi", "swagger", "codegen", "specification", "api"]
+
+[lints.clippy]
+pedantic = { level = "warn", priority = -1 }
+missing_errors_doc = "allow"
+missing_panics_doc = "allow"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+serde_yaml_ng = "0.10"
+anyhow = "1"
+
+[dev-dependencies]
+tempfile = "3"
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+strip = true
