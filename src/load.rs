@@ -170,4 +170,37 @@ paths: {}
         fn assert_send_sync<T: Send + Sync>() {}
         assert_send_sync::<FileSpecLoader>();
     }
+
+    #[test]
+    fn load_spec_unknown_extension_tries_both() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("spec.txt");
+        std::fs::write(
+            &path,
+            r#"{"info":{"title":"Test","version":"1.0"},"paths":{}}"#,
+        )
+        .unwrap();
+        let spec = load_spec(&path).unwrap();
+        assert_eq!(spec.info.title, "Test");
+    }
+
+    #[test]
+    fn load_spec_from_str_unknown_extension_json() {
+        let spec = load_spec_from_str(
+            r#"{"info":{"title":"FromStr","version":"1.0"},"paths":{}}"#,
+            Path::new("spec.unknown"),
+        )
+        .unwrap();
+        assert_eq!(spec.info.title, "FromStr");
+    }
+
+    #[test]
+    fn load_spec_from_str_unknown_extension_yaml() {
+        let spec = load_spec_from_str(
+            "info:\n  title: YamlStr\n  version: '1'\npaths: {}",
+            Path::new("spec.unknown"),
+        )
+        .unwrap();
+        assert_eq!(spec.info.title, "YamlStr");
+    }
 }

@@ -206,6 +206,78 @@ pub struct Server {
     pub description: Option<String>,
 }
 
+// ── Schema helpers ────────────────────────────────────────────────────
+
+impl Schema {
+    /// Check if this schema is a `$ref`.
+    #[must_use]
+    pub fn is_ref(&self) -> bool {
+        self.ref_path.is_some()
+    }
+
+    /// Check if this is an array type.
+    #[must_use]
+    pub fn is_array(&self) -> bool {
+        self.schema_type.as_deref() == Some("array")
+    }
+
+    /// Check if this is an object type.
+    #[must_use]
+    pub fn is_object(&self) -> bool {
+        self.schema_type.as_deref() == Some("object")
+    }
+
+    /// Check if this is a primitive type (string, integer, number, boolean).
+    #[must_use]
+    pub fn is_primitive(&self) -> bool {
+        matches!(
+            self.schema_type.as_deref(),
+            Some("string" | "integer" | "number" | "boolean")
+        )
+    }
+
+    /// Check if this schema has enum values.
+    #[must_use]
+    pub fn is_enum(&self) -> bool {
+        self.enum_values.as_ref().is_some_and(|v| !v.is_empty())
+    }
+
+    /// Get the ref name if this is a `$ref` schema.
+    #[must_use]
+    pub fn ref_name(&self) -> Option<&str> {
+        self.ref_path.as_deref().map(ref_name)
+    }
+}
+
+// ── Operation helpers ─────────────────────────────────────────────────
+
+impl Operation {
+    /// Get the JSON body schema from `request_body`, if any.
+    #[must_use]
+    pub fn json_body_schema(&self) -> Option<&Schema> {
+        self.request_body
+            .as_ref()?
+            .content
+            .get("application/json")?
+            .schema
+            .as_ref()
+    }
+
+    /// Get the success response schema (200 or 201).
+    #[must_use]
+    pub fn success_response_schema(&self) -> Option<&Schema> {
+        let resp = self
+            .responses
+            .get("200")
+            .or_else(|| self.responses.get("201"))?;
+        resp.content
+            .as_ref()?
+            .get("application/json")?
+            .schema
+            .as_ref()
+    }
+}
+
 // ── $ref resolution helpers ────────────────────────────────────────────────
 
 /// Extract the final component name from a JSON pointer.
@@ -1060,5 +1132,219 @@ paths:
         let spec: OpenApiSpec = serde_yaml_ng::from_str(yaml).unwrap();
         let op = spec.paths["/items"].get.as_ref().unwrap();
         assert_eq!(op.tags, vec!["items", "public"]);
+    }
+
+    // ── Schema helper tests ─────────────────────────────────────
+
+    #[test]
+    fn schema_is_ref() {
+        let s = Schema {
+            ref_path: Some("#/components/schemas/Pet".to_string()),
+            ..Default::default()
+        };
+        assert!(s.is_ref());
+        assert_eq!(s.ref_name(), Some("Pet"));
+    }
+
+    #[test]
+    fn schema_is_not_ref() {
+        let s = Schema::default();
+        assert!(!s.is_ref());
+        assert_eq!(s.ref_name(), None);
+    }
+
+    #[test]
+    fn schema_is_array() {
+        let s = Schema {
+            schema_type: Some("array".to_string()),
+            ..Default::default()
+        };
+        assert!(s.is_array());
+        assert!(!s.is_object());
+        assert!(!s.is_primitive());
+    }
+
+    #[test]
+    fn schema_is_object() {
+        let s = Schema {
+            schema_type: Some("object".to_string()),
+            ..Default::default()
+        };
+        assert!(s.is_object());
+        assert!(!s.is_array());
+        assert!(!s.is_primitive());
+    }
+
+    #[test]
+    fn schema_is_primitive_string() {
+        let s = Schema {
+            schema_type: Some("string".to_string()),
+            ..Default::default()
+        };
+        assert!(s.is_primitive());
+        assert!(!s.is_object());
+        assert!(!s.is_array());
+    }
+
+    #[test]
+    fn schema_is_primitive_integer() {
+        let s = Schema {
+            schema_type: Some("integer".to_string()),
+            ..Default::default()
+        };
+        assert!(s.is_primitive());
+    }
+
+    #[test]
+    fn schema_is_primitive_number() {
+        let s = Schema {
+            schema_type: Some("number".to_string()),
+            ..Default::default()
+        };
+        assert!(s.is_primitive());
+    }
+
+    #[test]
+    fn schema_is_primitive_boolean() {
+        let s = Schema {
+            schema_type: Some("boolean".to_string()),
+            ..Default::default()
+        };
+        assert!(s.is_primitive());
+    }
+
+    #[test]
+    fn schema_is_enum() {
+        let s = Schema {
+            enum_values: Some(vec![serde_json::Value::String("a".to_string())]),
+            ..Default::default()
+        };
+        assert!(s.is_enum());
+    }
+
+    #[test]
+    fn schema_is_not_enum_empty() {
+        let s = Schema {
+            enum_values: Some(vec![]),
+            ..Default::default()
+        };
+        assert!(!s.is_enum());
+    }
+
+    #[test]
+    fn schema_is_not_enum_none() {
+        let s = Schema::default();
+        assert!(!s.is_enum());
+    }
+
+    #[test]
+    fn schema_ref_name_nested_path() {
+        let s = Schema {
+            ref_path: Some("#/components/schemas/deeply/Nested".to_string()),
+            ..Default::default()
+        };
+        assert_eq!(s.ref_name(), Some("Nested"));
+    }
+
+    #[test]
+    fn schema_no_type_is_not_primitive_or_array_or_object() {
+        let s = Schema::default();
+        assert!(!s.is_primitive());
+        assert!(!s.is_array());
+        assert!(!s.is_object());
+    }
+
+    // ── Operation helper tests ──────────────────────────────────
+
+    #[test]
+    fn operation_json_body_schema() {
+        let spec: OpenApiSpec = serde_yaml_ng::from_str(FULL_SPEC_YAML).unwrap();
+        let post_op = spec.paths["/pets"].post.as_ref().unwrap();
+        let body_schema = post_op.json_body_schema();
+        assert!(body_schema.is_some());
+        assert!(body_schema.unwrap().is_ref());
+    }
+
+    #[test]
+    fn operation_json_body_schema_none_when_no_body() {
+        let spec: OpenApiSpec = serde_yaml_ng::from_str(FULL_SPEC_YAML).unwrap();
+        let get_op = spec.paths["/pets"].get.as_ref().unwrap();
+        assert!(get_op.json_body_schema().is_none());
+    }
+
+    #[test]
+    fn operation_success_response_200() {
+        let spec: OpenApiSpec = serde_yaml_ng::from_str(FULL_SPEC_YAML).unwrap();
+        let get_op = spec.paths["/pets"].get.as_ref().unwrap();
+        let resp_schema = get_op.success_response_schema();
+        assert!(resp_schema.is_some());
+        assert!(resp_schema.unwrap().is_array());
+    }
+
+    #[test]
+    fn operation_success_response_201() {
+        let spec: OpenApiSpec = serde_yaml_ng::from_str(FULL_SPEC_YAML).unwrap();
+        let post_op = spec.paths["/pets"].post.as_ref().unwrap();
+        let resp_schema = post_op.success_response_schema();
+        assert!(resp_schema.is_some());
+        assert!(resp_schema.unwrap().is_ref());
+    }
+
+    #[test]
+    fn operation_success_response_none_when_no_content() {
+        let spec: OpenApiSpec = serde_yaml_ng::from_str(FULL_SPEC_YAML).unwrap();
+        let delete_op = spec.paths["/pets/{petId}"].delete.as_ref().unwrap();
+        assert!(delete_op.success_response_schema().is_none());
+    }
+
+    // ── all_operations comprehensive ────────────────────────────
+
+    #[test]
+    fn all_operations_returns_correct_methods() {
+        let spec: OpenApiSpec = serde_yaml_ng::from_str(FULL_SPEC_YAML).unwrap();
+        let ops = all_operations(&spec);
+        let methods: Vec<&str> = ops.iter().map(|(m, _, _)| m.as_str()).collect();
+        assert!(methods.contains(&"get"));
+        assert!(methods.contains(&"post"));
+        assert!(methods.contains(&"delete"));
+    }
+
+    #[test]
+    fn all_operations_empty_spec() {
+        let spec: OpenApiSpec =
+            serde_yaml_ng::from_str("info:\n  title: E\n  version: '1'\npaths: {}")
+                .unwrap();
+        assert!(all_operations(&spec).is_empty());
+    }
+
+    // ── Schema helpers on parsed spec ───────────────────────────
+
+    #[test]
+    fn parsed_schema_helpers_on_pet() {
+        let spec: OpenApiSpec = serde_yaml_ng::from_str(FULL_SPEC_YAML).unwrap();
+        let pet = &spec.components.as_ref().unwrap().schemas["Pet"];
+        assert!(pet.is_object());
+        assert!(!pet.is_array());
+        assert!(!pet.is_primitive());
+        assert!(!pet.is_ref());
+        assert!(!pet.is_enum());
+    }
+
+    #[test]
+    fn parsed_schema_helpers_on_pet_status() {
+        let spec: OpenApiSpec = serde_yaml_ng::from_str(FULL_SPEC_YAML).unwrap();
+        let status = &spec.components.as_ref().unwrap().schemas["PetStatus"];
+        assert!(status.is_primitive());
+        assert!(status.is_enum());
+        assert!(!status.is_object());
+    }
+
+    #[test]
+    fn parsed_schema_helpers_on_ref_property() {
+        let spec: OpenApiSpec = serde_yaml_ng::from_str(FULL_SPEC_YAML).unwrap();
+        let pet = &spec.components.as_ref().unwrap().schemas["Pet"];
+        let status_prop = &pet.properties["status"];
+        assert!(status_prop.is_ref());
+        assert_eq!(status_prop.ref_name(), Some("PetStatus"));
     }
 }
