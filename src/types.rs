@@ -224,6 +224,18 @@ pub struct Server {
     pub description: Option<String>,
 }
 
+impl std::fmt::Display for OpenApiSpec {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "OpenAPI spec: {} ({} paths, {} operations)",
+            self.info,
+            self.paths.len(),
+            self.operation_count()
+        )
+    }
+}
+
 // ── PathItem helpers ──────────────────────────────────────────────────
 
 const HTTP_METHODS: [&str; 5] = ["get", "post", "put", "delete", "patch"];
@@ -1830,6 +1842,20 @@ paths:
     // ── PathItem::operations() tests ────────────────────────────
 
     // ── Display and PartialEq tests ─────────────────────────────
+
+    #[test]
+    fn spec_display_format() {
+        let spec: OpenApiSpec = serde_yaml_ng::from_str(FULL_SPEC_YAML).unwrap();
+        let display = spec.to_string();
+        assert_eq!(display, "OpenAPI spec: Pet Store v2.0.0 (2 paths, 4 operations)");
+    }
+
+    #[test]
+    fn spec_display_minimal() {
+        let spec: OpenApiSpec = serde_yaml_ng::from_str(MINIMAL_SPEC_YAML).unwrap();
+        let display = spec.to_string();
+        assert_eq!(display, "OpenAPI spec: Test API v1.0.0 (0 paths, 0 operations)");
+    }
 
     #[test]
     fn info_display_format() {
