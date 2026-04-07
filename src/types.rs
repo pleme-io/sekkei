@@ -358,24 +358,22 @@ impl OpenApiSpec {
 
 /// Enumerate all operations across all paths.
 /// Returns `(method, path, &Operation)` triples.
+///
+/// Prefer [`OpenApiSpec::all_operations`] for new code.
 #[must_use]
 pub fn all_operations(spec: &OpenApiSpec) -> Vec<(String, String, &Operation)> {
-    let mut ops = Vec::new();
-    for (path, item) in &spec.paths {
-        let methods: &[(&str, &Option<Operation>)] = &[
-            ("get", &item.get),
-            ("post", &item.post),
-            ("put", &item.put),
-            ("delete", &item.delete),
-            ("patch", &item.patch),
-        ];
-        for &(method, op) in methods {
-            if let Some(op) = op {
-                ops.push((method.to_string(), path.clone(), op));
-            }
-        }
+    spec.all_operations().collect()
+}
+
+impl OpenApiSpec {
+    /// Iterate over every operation in the spec as `(method, path, &Operation)` triples.
+    pub fn all_operations(&self) -> impl Iterator<Item = (String, String, &Operation)> {
+        self.paths.iter().flat_map(|(path, item)| {
+            let path = path.clone();
+            item.operations()
+                .map(move |(method, op)| (method.to_string(), path.clone(), op))
+        })
     }
-    ops
 }
 
 #[cfg(test)]
@@ -1948,6 +1946,25 @@ paths:
     }
 
     // ── PathItem::operations() tests ────────────────────────────
+
+    #[test]
+    fn spec_all_operations_iterator() {
+        let spec: OpenApiSpec = serde_yaml_ng::from_str(FULL_SPEC_YAML).unwrap();
+        let ops: Vec<_> = spec.all_operations().collect();
+        assert_eq!(ops.len(), 4);
+        let methods_and_paths: Vec<(&str, &str)> =
+            ops.iter().map(|(m, p, _)| (m.as_str(), p.as_str())).collect();
+        assert!(methods_and_paths.contains(&("get", "/pets")));
+        assert!(methods_and_paths.contains(&("post", "/pets")));
+        assert!(methods_and_paths.contains(&("get", "/pets/{petId}")));
+        assert!(methods_and_paths.contains(&("delete", "/pets/{petId}")));
+    }
+
+    #[test]
+    fn spec_all_operations_empty() {
+        let spec: OpenApiSpec = serde_yaml_ng::from_str(MINIMAL_SPEC_YAML).unwrap();
+        assert_eq!(spec.all_operations().count(), 0);
+    }
 
     #[test]
     fn path_item_operations_returns_defined_methods() {
