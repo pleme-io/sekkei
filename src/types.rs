@@ -1365,4 +1365,562 @@ paths:
         assert!(status_prop.is_ref());
         assert_eq!(status_prop.ref_name(), Some("PetStatus"));
     }
+
+    // ── YAML ↔ JSON round-trip ────────────────────────────────────
+
+    #[test]
+    fn roundtrip_yaml_to_json_to_yaml() {
+        let spec: OpenApiSpec = serde_yaml_ng::from_str(FULL_SPEC_YAML).unwrap();
+        let json = serde_json::to_string_pretty(&spec).unwrap();
+        let from_json: OpenApiSpec = serde_json::from_str(&json).unwrap();
+        let yaml_again = serde_yaml_ng::to_string(&from_json).unwrap();
+        let from_yaml: OpenApiSpec = serde_yaml_ng::from_str(&yaml_again).unwrap();
+
+        assert_eq!(from_yaml.info.title, "Pet Store");
+        assert_eq!(from_yaml.info.version, "2.0.0");
+        assert_eq!(from_yaml.paths.len(), 2);
+        assert_eq!(
+            from_yaml.components.as_ref().unwrap().schemas.len(),
+            3
+        );
+    }
+
+    #[test]
+    fn roundtrip_preserves_all_operations() {
+        let spec: OpenApiSpec = serde_yaml_ng::from_str(FULL_SPEC_YAML).unwrap();
+        let json = serde_json::to_string(&spec).unwrap();
+        let roundtrip: OpenApiSpec = serde_json::from_str(&json).unwrap();
+        let orig_ops = all_operations(&spec);
+        let rt_ops = all_operations(&roundtrip);
+        assert_eq!(orig_ops.len(), rt_ops.len());
+        for (orig, rt) in orig_ops.iter().zip(rt_ops.iter()) {
+            assert_eq!(orig.0, rt.0);
+            assert_eq!(orig.1, rt.1);
+            assert_eq!(orig.2.operation_id, rt.2.operation_id);
+        }
+    }
+
+    #[test]
+    fn roundtrip_preserves_schema_fields() {
+        let spec: OpenApiSpec = serde_yaml_ng::from_str(FULL_SPEC_YAML).unwrap();
+        let json = serde_json::to_string(&spec).unwrap();
+        let roundtrip: OpenApiSpec = serde_json::from_str(&json).unwrap();
+
+        let orig_pet = &spec.components.as_ref().unwrap().schemas["Pet"];
+        let rt_pet = &roundtrip.components.as_ref().unwrap().schemas["Pet"];
+        assert_eq!(orig_pet.schema_type, rt_pet.schema_type);
+        assert_eq!(orig_pet.required, rt_pet.required);
+        assert_eq!(orig_pet.properties.len(), rt_pet.properties.len());
+    }
+
+    #[test]
+    fn roundtrip_preserves_servers() {
+        let spec: OpenApiSpec = serde_yaml_ng::from_str(FULL_SPEC_YAML).unwrap();
+        let json = serde_json::to_string(&spec).unwrap();
+        let roundtrip: OpenApiSpec = serde_json::from_str(&json).unwrap();
+        assert_eq!(spec.servers.len(), roundtrip.servers.len());
+        assert_eq!(spec.servers[0].url, roundtrip.servers[0].url);
+        assert_eq!(spec.servers[0].description, roundtrip.servers[0].description);
+    }
+
+    #[test]
+    fn roundtrip_preserves_security() {
+        let spec: OpenApiSpec = serde_yaml_ng::from_str(FULL_SPEC_YAML).unwrap();
+        let json = serde_json::to_string(&spec).unwrap();
+        let roundtrip: OpenApiSpec = serde_json::from_str(&json).unwrap();
+        assert_eq!(spec.security, roundtrip.security);
+    }
+
+    // ── Complex schema compositions ──────────────────────────────
+
+    #[test]
+    fn parse_deeply_nested_schema() {
+        let yaml = r#"
+info:
+  title: Nested Test
+  version: "1.0.0"
+paths: {}
+components:
+  schemas:
+    Outer:
+      type: object
+      properties:
+        inner:
+          type: object
+          properties:
+            deep:
+              type: array
+              items:
+                type: string
+"#;
+        let spec: OpenApiSpec = serde_yaml_ng::from_str(yaml).unwrap();
+        let outer = &spec.components.as_ref().unwrap().schemas["Outer"];
+        let inner = &outer.properties["inner"];
+        assert!(inner.is_object());
+        let deep = &inner.properties["deep"];
+        assert!(deep.is_array());
+        let items = deep.items.as_ref().unwrap();
+        assert!(items.is_primitive());
+        assert_eq!(items.schema_type.as_deref(), Some("string"));
+    }
+
+    #[test]
+    fn parse_all_of_with_override_properties() {
+        let yaml = r##"
+info:
+  title: AllOf Override
+  version: "1.0.0"
+paths: {}
+components:
+  schemas:
+    Base:
+      type: object
+      properties:
+        id:
+          type: integer
+    Extended:
+      allOf:
+        - $ref: "#/components/schemas/Base"
+        - type: object
+          required:
+            - name
+          properties:
+            name:
+              type: string
+            role:
+              type: string
+              enum:
+                - admin
+                - user
+"##;
+        let spec: OpenApiSpec = serde_yaml_ng::from_str(yaml).unwrap();
+        let extended = &spec.components.as_ref().unwrap().schemas["Extended"];
+        assert_eq!(extended.all_of.len(), 2);
+        let override_part = &extended.all_of[1];
+        assert_eq!(override_part.required, vec!["name"]);
+        assert!(override_part.properties["role"].is_enum());
+    }
+
+    // ── Ref resolution edge cases ────────────────────────────────
+
+    #[test]
+    fn resolve_schema_ref_chain() {
+        let yaml = r##"
+info:
+  title: Ref Chain
+  version: "1.0.0"
+paths: {}
+components:
+  schemas:
+    Alias:
+      $ref: "#/components/schemas/Real"
+    Real:
+      type: string
+"##;
+        let spec: OpenApiSpec = serde_yaml_ng::from_str(yaml).unwrap();
+        let alias = spec.resolve_schema_ref("#/components/schemas/Alias").unwrap();
+        assert!(alias.is_ref());
+        let real = spec.resolve_schema_ref("#/components/schemas/Real").unwrap();
+        assert!(real.is_primitive());
+    }
+
+    #[test]
+    fn resolve_refs_with_empty_components() {
+        let yaml = r#"
+info:
+  title: Empty Components
+  version: "1.0.0"
+paths: {}
+components:
+  schemas: {}
+"#;
+        let spec: OpenApiSpec = serde_yaml_ng::from_str(yaml).unwrap();
+        assert!(spec.resolve_schema_ref("#/components/schemas/Missing").is_none());
+        assert!(spec.resolve_parameter_ref("#/components/parameters/Missing").is_none());
+        assert!(spec.resolve_request_body_ref("#/components/requestBodies/Missing").is_none());
+        assert!(spec.resolve_response_ref("#/components/responses/Missing").is_none());
+    }
+
+    // ── Operation with operation-level security ──────────────────
+
+    #[test]
+    fn parse_operation_level_security() {
+        let yaml = r#"
+info:
+  title: OpSecurity
+  version: "1.0.0"
+paths:
+  /secure:
+    get:
+      operationId: secureEndpoint
+      security:
+        - apiKey: []
+        - oauth2:
+            - read
+            - write
+      responses:
+        "200":
+          description: OK
+"#;
+        let spec: OpenApiSpec = serde_yaml_ng::from_str(yaml).unwrap();
+        let op = spec.paths["/secure"].get.as_ref().unwrap();
+        assert_eq!(op.security.len(), 2);
+        assert!(op.security[0].contains_key("apiKey"));
+        let oauth_scopes = &op.security[1]["oauth2"];
+        assert_eq!(oauth_scopes, &vec!["read".to_string(), "write".to_string()]);
+    }
+
+    // ── Multiple content types ───────────────────────────────────
+
+    #[test]
+    fn parse_multiple_content_types() {
+        let yaml = r#"
+info:
+  title: MultiContent
+  version: "1.0.0"
+paths:
+  /upload:
+    post:
+      operationId: upload
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+          multipart/form-data:
+            schema:
+              type: object
+      responses:
+        "200":
+          description: OK
+"#;
+        let spec: OpenApiSpec = serde_yaml_ng::from_str(yaml).unwrap();
+        let body = spec.paths["/upload"]
+            .post
+            .as_ref()
+            .unwrap()
+            .request_body
+            .as_ref()
+            .unwrap();
+        assert_eq!(body.content.len(), 2);
+        assert!(body.content.contains_key("application/json"));
+        assert!(body.content.contains_key("multipart/form-data"));
+    }
+
+    // ── Operation with no operationId ────────────────────────────
+
+    #[test]
+    fn parse_operation_without_operation_id() {
+        let yaml = r#"
+info:
+  title: NoOpId
+  version: "1.0.0"
+paths:
+  /items:
+    get:
+      responses:
+        "200":
+          description: OK
+"#;
+        let spec: OpenApiSpec = serde_yaml_ng::from_str(yaml).unwrap();
+        let op = spec.paths["/items"].get.as_ref().unwrap();
+        assert!(op.operation_id.is_none());
+        assert!(op.summary.is_none());
+        assert!(op.description.is_none());
+        assert!(op.tags.is_empty());
+        assert!(op.parameters.is_empty());
+        assert!(op.request_body.is_none());
+        assert!(op.security.is_empty());
+    }
+
+    // ── all_operations with put and patch ────────────────────────
+
+    #[test]
+    fn all_operations_includes_put_and_patch() {
+        let yaml = r#"
+info:
+  title: PutPatch
+  version: "1.0.0"
+paths:
+  /items/{id}:
+    put:
+      operationId: replaceItem
+      responses:
+        "200":
+          description: OK
+    patch:
+      operationId: updateItem
+      responses:
+        "200":
+          description: OK
+"#;
+        let spec: OpenApiSpec = serde_yaml_ng::from_str(yaml).unwrap();
+        let ops = all_operations(&spec);
+        assert_eq!(ops.len(), 2);
+        let methods: Vec<&str> = ops.iter().map(|(m, _, _)| m.as_str()).collect();
+        assert!(methods.contains(&"put"));
+        assert!(methods.contains(&"patch"));
+    }
+
+    // ── Schema with multiple numeric constraints ─────────────────
+
+    #[test]
+    fn parse_schema_with_all_constraints() {
+        let yaml = r#"
+info:
+  title: Constraints
+  version: "1.0.0"
+paths: {}
+components:
+  schemas:
+    ConstrainedString:
+      type: string
+      minLength: 1
+      maxLength: 100
+      default: "hello"
+      title: A constrained string
+      description: Must be between 1 and 100 chars
+      nullable: true
+"#;
+        let spec: OpenApiSpec = serde_yaml_ng::from_str(yaml).unwrap();
+        let schema = &spec.components.as_ref().unwrap().schemas["ConstrainedString"];
+        assert_eq!(schema.min_length, Some(1));
+        assert_eq!(schema.max_length, Some(100));
+        assert_eq!(
+            schema.default.as_ref().and_then(|v| v.as_str()),
+            Some("hello")
+        );
+        assert_eq!(schema.title.as_deref(), Some("A constrained string"));
+        assert_eq!(
+            schema.description.as_deref(),
+            Some("Must be between 1 and 100 chars")
+        );
+        assert!(schema.nullable);
+        assert!(schema.is_primitive());
+    }
+
+    // ── ref_name edge cases ──────────────────────────────────────
+
+    #[test]
+    fn ref_name_empty_string() {
+        assert_eq!(ref_name(""), "");
+    }
+
+    #[test]
+    fn ref_name_single_slash() {
+        assert_eq!(ref_name("/"), "");
+    }
+
+    #[test]
+    fn ref_name_multiple_trailing_slashes() {
+        assert_eq!(ref_name("a/b/c/"), "");
+    }
+
+    // ── Parameter with $ref ──────────────────────────────────────
+
+    #[test]
+    fn parameter_ref_path_field_deserialized() {
+        let json = r##"{
+            "name": "limit",
+            "in": "query",
+            "$ref": "#/components/parameters/LimitParam"
+        }"##;
+        let param: Parameter = serde_json::from_str(json).unwrap();
+        assert_eq!(
+            param.ref_path.as_deref(),
+            Some("#/components/parameters/LimitParam")
+        );
+        assert_eq!(param.name, "limit");
+    }
+
+    // ── Request body with $ref ───────────────────────────────────
+
+    #[test]
+    fn parse_request_body_with_ref() {
+        let yaml = r##"
+info:
+  title: BodyRef
+  version: "1.0.0"
+paths:
+  /items:
+    post:
+      requestBody:
+        $ref: "#/components/requestBodies/ItemBody"
+      responses:
+        "201":
+          description: Created
+components:
+  requestBodies:
+    ItemBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+"##;
+        let spec: OpenApiSpec = serde_yaml_ng::from_str(yaml).unwrap();
+        let body = spec.paths["/items"]
+            .post
+            .as_ref()
+            .unwrap()
+            .request_body
+            .as_ref()
+            .unwrap();
+        assert_eq!(
+            body.ref_path.as_deref(),
+            Some("#/components/requestBodies/ItemBody")
+        );
+    }
+
+    // ── Response with $ref ───────────────────────────────────────
+
+    #[test]
+    fn parse_response_with_ref() {
+        let yaml = r##"
+info:
+  title: RespRef
+  version: "1.0.0"
+paths:
+  /items:
+    get:
+      responses:
+        "404":
+          $ref: "#/components/responses/NotFound"
+components:
+  responses:
+    NotFound:
+      description: Not found
+"##;
+        let spec: OpenApiSpec = serde_yaml_ng::from_str(yaml).unwrap();
+        let resp = &spec.paths["/items"].get.as_ref().unwrap().responses["404"];
+        assert_eq!(
+            resp.ref_path.as_deref(),
+            Some("#/components/responses/NotFound")
+        );
+    }
+
+    // ── PartialEq for security requirements ──────────────────────
+
+    #[test]
+    fn multiple_servers_parsed() {
+        let yaml = r#"
+info:
+  title: MultiServer
+  version: "1.0.0"
+paths: {}
+servers:
+  - url: https://prod.example.com
+    description: Production
+  - url: https://staging.example.com
+    description: Staging
+  - url: http://localhost:8080
+"#;
+        let spec: OpenApiSpec = serde_yaml_ng::from_str(yaml).unwrap();
+        assert_eq!(spec.servers.len(), 3);
+        assert_eq!(spec.servers[0].url, "https://prod.example.com");
+        assert_eq!(spec.servers[2].url, "http://localhost:8080");
+        assert!(spec.servers[2].description.is_none());
+    }
+
+    // ── Info description ─────────────────────────────────────────
+
+    #[test]
+    fn info_without_description() {
+        let spec: OpenApiSpec = serde_yaml_ng::from_str(MINIMAL_SPEC_YAML).unwrap();
+        assert!(spec.info.description.is_none());
+    }
+
+    // ── Schema with additional_properties box ────────────────────
+
+    #[test]
+    fn parse_schema_additional_properties_nested() {
+        let yaml = r#"
+info:
+  title: NestedAdditional
+  version: "1.0.0"
+paths: {}
+components:
+  schemas:
+    Map:
+      type: object
+      additionalProperties:
+        type: array
+        items:
+          type: integer
+"#;
+        let spec: OpenApiSpec = serde_yaml_ng::from_str(yaml).unwrap();
+        let map = &spec.components.as_ref().unwrap().schemas["Map"];
+        let ap = map.additional_properties.as_ref().unwrap();
+        assert!(ap.is_array());
+        let items = ap.items.as_ref().unwrap();
+        assert_eq!(items.schema_type.as_deref(), Some("integer"));
+    }
+
+    // ── Operation json_body_schema with non-JSON content ─────────
+
+    #[test]
+    fn json_body_schema_none_when_xml_only() {
+        let yaml = r#"
+info:
+  title: XmlBody
+  version: "1.0.0"
+paths:
+  /items:
+    post:
+      requestBody:
+        content:
+          application/xml:
+            schema:
+              type: object
+      responses:
+        "201":
+          description: Created
+"#;
+        let spec: OpenApiSpec = serde_yaml_ng::from_str(yaml).unwrap();
+        let op = spec.paths["/items"].post.as_ref().unwrap();
+        assert!(op.json_body_schema().is_none());
+    }
+
+    // ── Success response with non-JSON content ───────────────────
+
+    #[test]
+    fn success_response_schema_none_when_no_json() {
+        let yaml = r#"
+info:
+  title: NoJsonResp
+  version: "1.0.0"
+paths:
+  /items:
+    get:
+      responses:
+        "200":
+          description: OK
+          content:
+            text/plain:
+              schema:
+                type: string
+"#;
+        let spec: OpenApiSpec = serde_yaml_ng::from_str(yaml).unwrap();
+        let op = spec.paths["/items"].get.as_ref().unwrap();
+        assert!(op.success_response_schema().is_none());
+    }
+
+    #[test]
+    fn success_response_schema_none_when_only_404() {
+        let yaml = r#"
+info:
+  title: Only404
+  version: "1.0.0"
+paths:
+  /items:
+    get:
+      responses:
+        "404":
+          description: Not found
+"#;
+        let spec: OpenApiSpec = serde_yaml_ng::from_str(yaml).unwrap();
+        let op = spec.paths["/items"].get.as_ref().unwrap();
+        assert!(op.success_response_schema().is_none());
+    }
 }
