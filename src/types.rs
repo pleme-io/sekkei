@@ -379,6 +379,20 @@ impl OpenApiSpec {
                 .map(move |(method, op)| (method.to_string(), path.clone(), op))
         })
     }
+
+    /// Returns the number of named schemas in `components.schemas`.
+    #[must_use]
+    pub fn schema_count(&self) -> usize {
+        self.components
+            .as_ref()
+            .map_or(0, |c| c.schemas.len())
+    }
+
+    /// Returns the total number of operations across all paths.
+    #[must_use]
+    pub fn operation_count(&self) -> usize {
+        self.paths.values().map(|item| item.operations().count()).sum()
+    }
 }
 
 #[cfg(test)]
@@ -1915,6 +1929,30 @@ paths:
     fn spec_all_operations_empty() {
         let spec: OpenApiSpec = serde_yaml_ng::from_str(MINIMAL_SPEC_YAML).unwrap();
         assert_eq!(spec.all_operations().count(), 0);
+    }
+
+    #[test]
+    fn spec_schema_count() {
+        let spec: OpenApiSpec = serde_yaml_ng::from_str(FULL_SPEC_YAML).unwrap();
+        assert_eq!(spec.schema_count(), 3);
+    }
+
+    #[test]
+    fn spec_schema_count_no_components() {
+        let spec: OpenApiSpec = serde_yaml_ng::from_str(MINIMAL_SPEC_YAML).unwrap();
+        assert_eq!(spec.schema_count(), 0);
+    }
+
+    #[test]
+    fn spec_operation_count() {
+        let spec: OpenApiSpec = serde_yaml_ng::from_str(FULL_SPEC_YAML).unwrap();
+        assert_eq!(spec.operation_count(), 4);
+    }
+
+    #[test]
+    fn spec_operation_count_empty() {
+        let spec: OpenApiSpec = serde_yaml_ng::from_str(MINIMAL_SPEC_YAML).unwrap();
+        assert_eq!(spec.operation_count(), 0);
     }
 
     #[test]
