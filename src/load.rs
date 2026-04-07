@@ -58,6 +58,53 @@ pub fn load_spec_from_str(content: &str, path: impl AsRef<Path>) -> Result<OpenA
     }
 }
 
+/// In-memory spec loader for testing. Returns a pre-configured spec or error.
+///
+/// ```
+/// # use sekkei::{MockSpecLoader, SpecLoader, OpenApiSpec};
+/// # use std::path::Path;
+/// let spec: OpenApiSpec = serde_json::from_str(
+///     r#"{"info":{"title":"T","version":"1"},"paths":{}}"#
+/// ).unwrap();
+/// let loader = MockSpecLoader::new(spec);
+/// assert!(loader.load(Path::new("any.json")).is_ok());
+/// ```
+#[cfg(any(test, feature = "test-support"))]
+#[derive(Debug, Clone)]
+pub struct MockSpecLoader {
+    result: Result<OpenApiSpec, String>,
+}
+
+#[cfg(any(test, feature = "test-support"))]
+impl MockSpecLoader {
+    /// Create a mock that always returns the given spec.
+    #[must_use]
+    pub fn new(spec: OpenApiSpec) -> Self {
+        Self { result: Ok(spec) }
+    }
+
+    /// Create a mock that always returns the given error message.
+    #[must_use]
+    pub fn failing(msg: impl Into<String>) -> Self {
+        Self {
+            result: Err(msg.into()),
+        }
+    }
+}
+
+#[cfg(any(test, feature = "test-support"))]
+impl SpecLoader for MockSpecLoader {
+    fn load(&self, path: &Path) -> Result<OpenApiSpec, SpecError> {
+        match &self.result {
+            Ok(spec) => Ok(spec.clone()),
+            Err(msg) => Err(SpecError::ReadFile {
+                path: path.to_path_buf(),
+                source: std::io::Error::new(std::io::ErrorKind::Other, msg.clone()),
+            }),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::io::Write;
@@ -317,5 +364,39 @@ paths: {}
     fn load_spec_from_str_empty_content_yaml() {
         let result = load_spec_from_str("", Path::new("empty.yaml"));
         assert!(result.is_err());
+    }
+
+    // ── MockSpecLoader tests ────────────────────────────────────
+
+    #[test]
+    fn mock_spec_loader_returns_spec() {
+        let spec: OpenApiSpec =
+            serde_json::from_str(r#"{"info":{"title":"Mock","version":"1.0"},"paths":{}}"#)
+                .unwrap();
+        let loader = MockSpecLoader::new(spec);
+        let result = loader.load(Path::new("any.yaml")).unwrap();
+        assert_eq!(result.info.title, "Mock");
+    }
+
+    #[test]
+    fn mock_spec_loader_returns_error() {
+        let loader = MockSpecLoader::failing("test failure");
+        let err = loader.load(Path::new("fail.yaml")).unwrap_err();
+        let msg = err.to_string();
+        assert!(msg.contains("fail.yaml"));
+    }
+
+    #[test]
+    fn mock_spec_loader_is_send_sync() {
+        fn assert_send_sync<T: Send + Sync>() {}
+        assert_send_sync::<MockSpecLoader>();
+    }
+
+    #[test]
+    fn mock_spec_loader_implements_spec_loader_trait() {
+        let spec: OpenApiSpec =
+            serde_json::from_str(r#"{"info":{"title":"T","version":"1"},"paths":{}}"#).unwrap();
+        let loader: Box<dyn SpecLoader> = Box::new(MockSpecLoader::new(spec));
+        assert!(loader.load(Path::new("test.json")).is_ok());
     }
 }
