@@ -348,4 +348,244 @@ components:
         assert!(collector.names.contains(&"PetStatus".to_string()));
         assert!(collector.names.contains(&"CreatePetRequest".to_string()));
     }
+
+    #[test]
+    fn visitor_receives_correct_path_strings() {
+        struct PathCollector {
+            paths: Vec<String>,
+        }
+        impl SpecVisitor for PathCollector {
+            fn visit_path(&mut self, path: &str, _: &PathItem) {
+                self.paths.push(path.to_string());
+            }
+        }
+        let spec: OpenApiSpec = serde_yaml_ng::from_str(FULL_SPEC_YAML).unwrap();
+        let mut collector = PathCollector { paths: Vec::new() };
+        walk_spec(&spec, &mut collector);
+        assert!(collector.paths.contains(&"/pets".to_string()));
+        assert!(collector.paths.contains(&"/pets/{petId}".to_string()));
+    }
+
+    #[test]
+    fn visitor_receives_method_and_path_for_operations() {
+        struct OpCollector {
+            entries: Vec<(String, String)>,
+        }
+        impl SpecVisitor for OpCollector {
+            fn visit_operation(&mut self, method: &str, path: &str, _: &Operation) {
+                self.entries.push((method.to_string(), path.to_string()));
+            }
+        }
+        let spec: OpenApiSpec = serde_yaml_ng::from_str(FULL_SPEC_YAML).unwrap();
+        let mut collector = OpCollector {
+            entries: Vec::new(),
+        };
+        walk_spec(&spec, &mut collector);
+        assert!(collector.entries.contains(&("get".to_string(), "/pets".to_string())));
+        assert!(collector.entries.contains(&("post".to_string(), "/pets".to_string())));
+        assert!(
+            collector
+                .entries
+                .contains(&("get".to_string(), "/pets/{petId}".to_string()))
+        );
+        assert!(
+            collector
+                .entries
+                .contains(&("delete".to_string(), "/pets/{petId}".to_string()))
+        );
+    }
+
+    #[test]
+    fn visitor_receives_parameter_details() {
+        struct ParamCollector {
+            names: Vec<String>,
+            locations: Vec<String>,
+        }
+        impl SpecVisitor for ParamCollector {
+            fn visit_parameter(&mut self, param: &Parameter) {
+                self.names.push(param.name.clone());
+                self.locations.push(param.location.clone());
+            }
+        }
+        let spec: OpenApiSpec = serde_yaml_ng::from_str(FULL_SPEC_YAML).unwrap();
+        let mut collector = ParamCollector {
+            names: Vec::new(),
+            locations: Vec::new(),
+        };
+        walk_spec(&spec, &mut collector);
+        assert!(collector.names.contains(&"limit".to_string()));
+        assert!(collector.names.contains(&"petId".to_string()));
+        assert!(collector.locations.contains(&"query".to_string()));
+        assert!(collector.locations.contains(&"path".to_string()));
+    }
+
+    #[test]
+    fn visitor_schema_receives_type_info() {
+        struct SchemaTypeCollector {
+            types: Vec<(String, Option<String>)>,
+        }
+        impl SpecVisitor for SchemaTypeCollector {
+            fn visit_schema(&mut self, name: &str, schema: &Schema) {
+                self.types
+                    .push((name.to_string(), schema.schema_type.clone()));
+            }
+        }
+        let spec: OpenApiSpec = serde_yaml_ng::from_str(FULL_SPEC_YAML).unwrap();
+        let mut collector = SchemaTypeCollector { types: Vec::new() };
+        walk_spec(&spec, &mut collector);
+        assert!(collector.types.contains(&("Pet".to_string(), Some("object".to_string()))));
+        assert!(
+            collector
+                .types
+                .contains(&("PetStatus".to_string(), Some("string".to_string())))
+        );
+    }
+
+    #[test]
+    fn visitor_spec_without_components() {
+        struct SchemaCounter {
+            count: usize,
+        }
+        impl SpecVisitor for SchemaCounter {
+            fn visit_schema(&mut self, _: &str, _: &Schema) {
+                self.count += 1;
+            }
+        }
+        let yaml = "info:\n  title: NoComp\n  version: '1'\npaths:\n  /test:\n    get:\n      responses:\n        '200':\n          description: OK";
+        let spec: OpenApiSpec = serde_yaml_ng::from_str(yaml).unwrap();
+        let mut counter = SchemaCounter { count: 0 };
+        walk_spec(&spec, &mut counter);
+        assert_eq!(counter.count, 0);
+    }
+
+    #[test]
+    fn visitor_with_all_http_methods() {
+        struct MethodCollector {
+            methods: Vec<String>,
+        }
+        impl SpecVisitor for MethodCollector {
+            fn visit_operation(&mut self, method: &str, _: &str, _: &Operation) {
+                self.methods.push(method.to_string());
+            }
+        }
+        let yaml = r#"
+info:
+  title: AllMethods
+  version: "1.0.0"
+paths:
+  /resource:
+    get:
+      responses:
+        "200":
+          description: OK
+    post:
+      responses:
+        "201":
+          description: Created
+    put:
+      responses:
+        "200":
+          description: OK
+    delete:
+      responses:
+        "204":
+          description: Deleted
+    patch:
+      responses:
+        "200":
+          description: OK
+"#;
+        let spec: OpenApiSpec = serde_yaml_ng::from_str(yaml).unwrap();
+        let mut collector = MethodCollector {
+            methods: Vec::new(),
+        };
+        walk_spec(&spec, &mut collector);
+        assert_eq!(collector.methods.len(), 5);
+        assert!(collector.methods.contains(&"get".to_string()));
+        assert!(collector.methods.contains(&"post".to_string()));
+        assert!(collector.methods.contains(&"put".to_string()));
+        assert!(collector.methods.contains(&"delete".to_string()));
+        assert!(collector.methods.contains(&"patch".to_string()));
+    }
+
+    #[test]
+    fn visitor_call_order_path_before_operations() {
+        #[derive(Debug, PartialEq)]
+        enum Event {
+            Path(String),
+            Op(String, String),
+        }
+        struct OrderTracker {
+            events: Vec<Event>,
+        }
+        impl SpecVisitor for OrderTracker {
+            fn visit_path(&mut self, path: &str, _: &PathItem) {
+                self.events.push(Event::Path(path.to_string()));
+            }
+            fn visit_operation(&mut self, method: &str, path: &str, _: &Operation) {
+                self.events
+                    .push(Event::Op(method.to_string(), path.to_string()));
+            }
+        }
+        let yaml = r#"
+info:
+  title: Order
+  version: "1.0.0"
+paths:
+  /a:
+    get:
+      responses:
+        "200":
+          description: OK
+"#;
+        let spec: OpenApiSpec = serde_yaml_ng::from_str(yaml).unwrap();
+        let mut tracker = OrderTracker {
+            events: Vec::new(),
+        };
+        walk_spec(&spec, &mut tracker);
+        assert_eq!(tracker.events[0], Event::Path("/a".to_string()));
+        assert_eq!(
+            tracker.events[1],
+            Event::Op("get".to_string(), "/a".to_string())
+        );
+    }
+
+    #[test]
+    fn visitor_path_level_and_operation_level_params() {
+        struct DetailedParamCollector {
+            params: Vec<(String, String)>,
+        }
+        impl SpecVisitor for DetailedParamCollector {
+            fn visit_parameter(&mut self, param: &Parameter) {
+                self.params
+                    .push((param.name.clone(), param.location.clone()));
+            }
+        }
+        let yaml = r#"
+info:
+  title: MixedParams
+  version: "1.0.0"
+paths:
+  /items/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+    get:
+      parameters:
+        - name: filter
+          in: query
+      responses:
+        "200":
+          description: OK
+"#;
+        let spec: OpenApiSpec = serde_yaml_ng::from_str(yaml).unwrap();
+        let mut collector = DetailedParamCollector {
+            params: Vec::new(),
+        };
+        walk_spec(&spec, &mut collector);
+        assert_eq!(collector.params.len(), 2);
+        assert!(collector.params.contains(&("filter".to_string(), "query".to_string())));
+        assert!(collector.params.contains(&("id".to_string(), "path".to_string())));
+    }
 }
