@@ -209,4 +209,108 @@ paths: {}
         .unwrap();
         assert_eq!(spec.info.title, "YamlStr");
     }
+
+    #[test]
+    fn load_nonexistent_file_returns_read_file_error() {
+        let result = load_spec(Path::new("/does/not/exist.yaml"));
+        match result.unwrap_err() {
+            SpecError::ReadFile { path, source } => {
+                assert_eq!(path, Path::new("/does/not/exist.yaml"));
+                assert_eq!(source.kind(), std::io::ErrorKind::NotFound);
+            }
+            other => panic!("expected ReadFile, got: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn load_invalid_json_file_returns_parse_json_error() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("bad.json");
+        std::fs::write(&path, "not json at all").unwrap();
+
+        match load_spec(&path).unwrap_err() {
+            SpecError::ParseJson {
+                path: err_path,
+                source: _,
+            } => {
+                assert_eq!(err_path, path);
+            }
+            other => panic!("expected ParseJson, got: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn load_invalid_yaml_file_returns_parse_yaml_error() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("bad.yaml");
+        std::fs::write(&path, ":\n  :\n    : [[[").unwrap();
+
+        match load_spec(&path).unwrap_err() {
+            SpecError::ParseYaml {
+                path: err_path,
+                source: _,
+            } => {
+                assert_eq!(err_path, path);
+            }
+            other => panic!("expected ParseYaml, got: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn load_invalid_unknown_ext_returns_parse_unknown_format_error() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("bad.txt");
+        std::fs::write(&path, "definitely not valid {{{{ anything").unwrap();
+
+        match load_spec(&path).unwrap_err() {
+            SpecError::ParseUnknownFormat {
+                path: err_path,
+                json_error: _,
+                yaml_error: _,
+            } => {
+                assert_eq!(err_path, path);
+            }
+            other => panic!("expected ParseUnknownFormat, got: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn load_spec_from_str_invalid_json_extension() {
+        let result = load_spec_from_str("{{bad}}", Path::new("spec.json"));
+        assert!(matches!(result, Err(SpecError::ParseJson { .. })));
+    }
+
+    #[test]
+    fn load_spec_from_str_invalid_yaml_extension() {
+        let result = load_spec_from_str(":\n  :\n    : [[[", Path::new("spec.yaml"));
+        assert!(matches!(result, Err(SpecError::ParseYaml { .. })));
+    }
+
+    #[test]
+    fn load_spec_from_str_invalid_yml_extension() {
+        let result = load_spec_from_str(":\n  :\n    : [[[", Path::new("spec.yml"));
+        assert!(matches!(result, Err(SpecError::ParseYaml { .. })));
+    }
+
+    #[test]
+    fn load_spec_from_str_no_extension() {
+        let spec = load_spec_from_str(
+            r#"{"info":{"title":"NoExt","version":"1.0"},"paths":{}}"#,
+            Path::new("spec"),
+        )
+        .unwrap();
+        assert_eq!(spec.info.title, "NoExt");
+    }
+
+    #[test]
+    fn load_spec_from_str_empty_content_json() {
+        let result = load_spec_from_str("", Path::new("empty.json"));
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn load_spec_from_str_empty_content_yaml() {
+        let result = load_spec_from_str("", Path::new("empty.yaml"));
+        assert!(result.is_err());
+    }
 }
