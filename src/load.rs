@@ -19,7 +19,9 @@ impl SpecLoader for FileSpecLoader {
 }
 
 /// Load an `OpenAPI` spec from a file, auto-detecting format by extension.
-pub fn load_spec(path: &Path) -> Result<OpenApiSpec, SpecError> {
+#[must_use = "this returns a Result that should be checked"]
+pub fn load_spec(path: impl AsRef<Path>) -> Result<OpenApiSpec, SpecError> {
+    let path = path.as_ref();
     let content = std::fs::read_to_string(path).map_err(|source| SpecError::ReadFile {
         path: path.to_path_buf(),
         source,
@@ -28,7 +30,9 @@ pub fn load_spec(path: &Path) -> Result<OpenApiSpec, SpecError> {
 }
 
 /// Load an `OpenAPI` spec from a string, using the path extension to determine format.
-pub fn load_spec_from_str(content: &str, path: &Path) -> Result<OpenApiSpec, SpecError> {
+#[must_use = "this returns a Result that should be checked"]
+pub fn load_spec_from_str(content: &str, path: impl AsRef<Path>) -> Result<OpenApiSpec, SpecError> {
+    let path = path.as_ref();
     let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
     match ext {
         "json" => serde_json::from_str(content).map_err(|source| SpecError::ParseJson {
