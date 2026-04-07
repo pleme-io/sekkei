@@ -1,4 +1,4 @@
-// SpecVisitor trait and walk_spec for walking OpenAPI specs.
+//! `SpecVisitor` trait and `walk_spec` for walking `OpenAPI` specs.
 
 use crate::types::{Operation, Parameter, PathItem, Schema};
 use crate::OpenApiSpec;
@@ -24,7 +24,7 @@ pub trait SpecVisitor {
 pub fn walk_spec(spec: &OpenApiSpec, visitor: &mut dyn SpecVisitor) {
     for (path, item) in &spec.paths {
         visitor.visit_path(path, item);
-        for (method, op) in path_operations(item) {
+        for (method, op) in item.operations() {
             visitor.visit_operation(method, path, op);
             for param in &op.parameters {
                 visitor.visit_parameter(param);
@@ -39,27 +39,6 @@ pub fn walk_spec(spec: &OpenApiSpec, visitor: &mut dyn SpecVisitor) {
             visitor.visit_schema(name, schema);
         }
     }
-}
-
-/// Extract all operations from a path item as `(method, &Operation)` pairs.
-fn path_operations(item: &PathItem) -> Vec<(&'static str, &Operation)> {
-    let mut ops = Vec::new();
-    if let Some(op) = &item.get {
-        ops.push(("get", op));
-    }
-    if let Some(op) = &item.post {
-        ops.push(("post", op));
-    }
-    if let Some(op) = &item.put {
-        ops.push(("put", op));
-    }
-    if let Some(op) = &item.delete {
-        ops.push(("delete", op));
-    }
-    if let Some(op) = &item.patch {
-        ops.push(("patch", op));
-    }
-    ops
 }
 
 #[cfg(test)]
