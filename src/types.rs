@@ -294,6 +294,12 @@ impl Schema {
         self.enum_values.as_ref().is_some_and(|v| !v.is_empty())
     }
 
+    /// Check if this schema uses composition (`allOf`, `oneOf`, or `anyOf`).
+    #[must_use]
+    pub fn is_composed(&self) -> bool {
+        !self.all_of.is_empty() || !self.one_of.is_empty() || !self.any_of.is_empty()
+    }
+
     /// Get the ref name if this is a `$ref` schema.
     #[must_use]
     pub fn ref_name(&self) -> Option<&str> {
@@ -1168,6 +1174,29 @@ paths:
     fn schema_is_not_enum_none() {
         let s = Schema::default();
         assert!(!s.is_enum());
+    }
+
+    #[test]
+    fn schema_is_composed_all_of() {
+        let s = Schema {
+            all_of: vec![Schema::default()],
+            ..Default::default()
+        };
+        assert!(s.is_composed());
+    }
+
+    #[test]
+    fn schema_is_composed_one_of() {
+        let s = Schema {
+            one_of: vec![Schema::default()],
+            ..Default::default()
+        };
+        assert!(s.is_composed());
+    }
+
+    #[test]
+    fn schema_is_not_composed_empty() {
+        assert!(!Schema::default().is_composed());
     }
 
     #[test]
