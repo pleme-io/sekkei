@@ -12,3 +12,6 @@ pub use error::*;
 pub use load::*;
 pub use types::*;
 pub use visitor::*;
+
+#[cfg(any(test, feature = "test-support"))]
+pub use load::MockSpecLoader;
