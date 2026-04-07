@@ -1,4 +1,4 @@
-// OpenAPI 3.0.3 serde types — canonical definitions for the pleme-io ecosystem.
+//! `OpenAPI` 3.0.3 serde types — canonical definitions for the pleme-io ecosystem.
 
 use std::collections::BTreeMap;
 
@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 
 // ── Root ───────────────────────────────────────────────────────────────────
 
+/// Root `OpenAPI` 3.0 specification object.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OpenApiSpec {
     pub info: Info,
@@ -21,6 +22,7 @@ pub struct OpenApiSpec {
 
 // ── Info ───────────────────────────────────────────────────────────────────
 
+/// Metadata about the API (title, version, description).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Info {
     pub title: String,
@@ -31,6 +33,7 @@ pub struct Info {
 
 // ── Paths & Operations ────────────────────────────────────────────────────
 
+/// Describes the operations available on a single path.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PathItem {
     #[serde(default)]
@@ -47,6 +50,7 @@ pub struct PathItem {
     pub parameters: Vec<Parameter>,
 }
 
+/// A single API operation on a path (e.g. GET, POST).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Operation {
@@ -70,6 +74,7 @@ pub struct Operation {
 
 // ── Parameters ─────────────────────────────────────────────────────────────
 
+/// Describes a single operation parameter (query, path, header, cookie).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Parameter {
     pub name: String,
@@ -88,6 +93,7 @@ pub struct Parameter {
 
 // ── Request / Response Bodies ──────────────────────────────────────────────
 
+/// Describes a request body with content type mappings.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RequestBody {
     #[serde(default)]
@@ -101,12 +107,14 @@ pub struct RequestBody {
     pub ref_path: Option<String>,
 }
 
+/// A media type (e.g. `application/json`) with an optional schema.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MediaType {
     #[serde(default)]
     pub schema: Option<Schema>,
 }
 
+/// Describes a single response from an API operation.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Response {
     #[serde(default)]
@@ -120,6 +128,7 @@ pub struct Response {
 
 // ── Schema ─────────────────────────────────────────────────────────────────
 
+/// JSON Schema object used to describe data types in `OpenAPI` specs.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct Schema {
@@ -166,6 +175,7 @@ pub struct Schema {
 
 // ── Components ─────────────────────────────────────────────────────────────
 
+/// Holds reusable schema, parameter, request body, and response definitions.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct Components {
@@ -181,6 +191,7 @@ pub struct Components {
     pub responses: BTreeMap<String, Response>,
 }
 
+/// Defines a security scheme that can be used by the operations.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SecurityScheme {
     #[serde(rename = "type")]
@@ -199,6 +210,7 @@ pub struct SecurityScheme {
 
 // ── Server ─────────────────────────────────────────────────────────────────
 
+/// An object representing a server.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Server {
     pub url: String,
