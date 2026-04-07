@@ -286,30 +286,35 @@ impl Operation {
 /// "#/components/schemas/Pet" → "Pet"
 /// "#/components/parameters/LimitParam" → "LimitParam"
 /// ```
+#[must_use]
 pub fn ref_name(ref_path: &str) -> &str {
     ref_path.rsplit('/').next().unwrap_or(ref_path)
 }
 
 impl OpenApiSpec {
     /// Look up a schema by `$ref` pointer like `#/components/schemas/Foo`.
+    #[must_use]
     pub fn resolve_schema_ref(&self, ref_path: &str) -> Option<&Schema> {
         let name = ref_name(ref_path);
         self.components.as_ref()?.schemas.get(name)
     }
 
     /// Look up a parameter by `$ref` pointer like `#/components/parameters/Foo`.
+    #[must_use]
     pub fn resolve_parameter_ref(&self, ref_path: &str) -> Option<&Parameter> {
         let name = ref_name(ref_path);
         self.components.as_ref()?.parameters.get(name)
     }
 
     /// Look up a request body by `$ref` pointer.
+    #[must_use]
     pub fn resolve_request_body_ref(&self, ref_path: &str) -> Option<&RequestBody> {
         let name = ref_name(ref_path);
         self.components.as_ref()?.request_bodies.get(name)
     }
 
     /// Look up a response by `$ref` pointer.
+    #[must_use]
     pub fn resolve_response_ref(&self, ref_path: &str) -> Option<&Response> {
         let name = ref_name(ref_path);
         self.components.as_ref()?.responses.get(name)
@@ -318,6 +323,7 @@ impl OpenApiSpec {
 
 /// Enumerate all operations across all paths.
 /// Returns `(method, path, &Operation)` triples.
+#[must_use]
 pub fn all_operations(spec: &OpenApiSpec) -> Vec<(String, String, &Operation)> {
     let mut ops = Vec::new();
     for (path, item) in &spec.paths {

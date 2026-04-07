@@ -3,7 +3,7 @@
 use crate::types::{Operation, Parameter, PathItem, Schema};
 use crate::OpenApiSpec;
 
-/// Visitor trait for walking OpenAPI specs.
+/// Visitor trait for walking `OpenAPI` specs.
 /// Implement specific methods to process only what you need.
 /// Default implementations are no-ops, enabling selective visiting.
 pub trait SpecVisitor {

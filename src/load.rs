@@ -4,7 +4,7 @@ use anyhow::{Context, Result};
 
 use crate::types::OpenApiSpec;
 
-/// Trait for loading OpenAPI specs from various sources.
+/// Trait for loading `OpenAPI` specs from various sources.
 pub trait SpecLoader: Send + Sync {
     fn load(&self, path: &Path) -> Result<OpenApiSpec>;
 }
@@ -18,14 +18,14 @@ impl SpecLoader for FileSpecLoader {
     }
 }
 
-/// Load an OpenAPI spec from a file, auto-detecting format by extension.
+/// Load an `OpenAPI` spec from a file, auto-detecting format by extension.
 pub fn load_spec(path: &Path) -> Result<OpenApiSpec> {
     let content = std::fs::read_to_string(path)
         .with_context(|| format!("failed to read spec file: {}", path.display()))?;
     load_spec_from_str(&content, path)
 }
 
-/// Load an OpenAPI spec from a string, using the path extension to determine format.
+/// Load an `OpenAPI` spec from a string, using the path extension to determine format.
 pub fn load_spec_from_str(content: &str, path: &Path) -> Result<OpenApiSpec> {
     let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
     match ext {
