@@ -10,6 +10,7 @@ pub trait SpecLoader: Send + Sync {
 }
 
 /// Loads specs from filesystem, auto-detecting JSON or YAML format.
+#[derive(Debug, Default, Clone, Copy)]
 pub struct FileSpecLoader;
 
 impl SpecLoader for FileSpecLoader {
