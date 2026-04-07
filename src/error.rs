@@ -4,6 +4,7 @@ use std::path::PathBuf;
 
 /// Errors that can occur when loading or parsing an `OpenAPI` spec.
 #[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
 pub enum SpecError {
     /// Failed to read a spec file from disk.
     #[error("failed to read spec file: {path}")]
