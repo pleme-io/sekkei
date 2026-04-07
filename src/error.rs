@@ -39,6 +39,21 @@ pub enum SpecError {
     },
 }
 
+impl SpecError {
+    /// Returns the path associated with this error, if any.
+    #[must_use]
+    pub fn path(&self) -> &Path {
+        match self {
+            Self::ReadFile { path, .. }
+            | Self::ParseJson { path, .. }
+            | Self::ParseYaml { path, .. }
+            | Self::ParseUnknownFormat { path, .. } => path,
+        }
+    }
+}
+
+use std::path::Path;
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -122,5 +137,39 @@ mod tests {
         let debug = format!("{err:?}");
         assert!(debug.contains("ReadFile"));
         assert!(debug.contains("test.yaml"));
+    }
+
+    #[test]
+    fn spec_error_path_accessor() {
+        let err = SpecError::ReadFile {
+            path: PathBuf::from("/foo/bar.yaml"),
+            source: std::io::Error::new(std::io::ErrorKind::NotFound, "missing"),
+        };
+        assert_eq!(err.path(), Path::new("/foo/bar.yaml"));
+    }
+
+    #[test]
+    fn spec_error_path_on_parse_json() {
+        let json_err = serde_json::from_str::<serde_json::Value>("{{bad}}")
+            .unwrap_err();
+        let err = SpecError::ParseJson {
+            path: PathBuf::from("bad.json"),
+            source: json_err,
+        };
+        assert_eq!(err.path(), Path::new("bad.json"));
+    }
+
+    #[test]
+    fn spec_error_path_on_unknown_format() {
+        let json_err = serde_json::from_str::<serde_json::Value>("bad")
+            .unwrap_err();
+        let yaml_err = serde_yaml_ng::from_str::<serde_json::Value>(":\n  :")
+            .unwrap_err();
+        let err = SpecError::ParseUnknownFormat {
+            path: PathBuf::from("mystery.txt"),
+            json_error: json_err,
+            yaml_error: yaml_err,
+        };
+        assert_eq!(err.path(), Path::new("mystery.txt"));
     }
 }
