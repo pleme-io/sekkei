@@ -1,49 +1,55 @@
 use std::path::Path;
 
-use anyhow::{Context, Result};
-
+use crate::error::SpecError;
 use crate::types::OpenApiSpec;
 
 /// Trait for loading `OpenAPI` specs from various sources.
 pub trait SpecLoader: Send + Sync {
-    fn load(&self, path: &Path) -> Result<OpenApiSpec>;
+    /// Load an `OpenAPI` spec from the given path.
+    fn load(&self, path: &Path) -> Result<OpenApiSpec, SpecError>;
 }
 
 /// Loads specs from filesystem, auto-detecting JSON or YAML format.
 pub struct FileSpecLoader;
 
 impl SpecLoader for FileSpecLoader {
-    fn load(&self, path: &Path) -> Result<OpenApiSpec> {
+    fn load(&self, path: &Path) -> Result<OpenApiSpec, SpecError> {
         load_spec(path)
     }
 }
 
 /// Load an `OpenAPI` spec from a file, auto-detecting format by extension.
-pub fn load_spec(path: &Path) -> Result<OpenApiSpec> {
-    let content = std::fs::read_to_string(path)
-        .with_context(|| format!("failed to read spec file: {}", path.display()))?;
+pub fn load_spec(path: &Path) -> Result<OpenApiSpec, SpecError> {
+    let content = std::fs::read_to_string(path).map_err(|source| SpecError::ReadFile {
+        path: path.to_path_buf(),
+        source,
+    })?;
     load_spec_from_str(&content, path)
 }
 
 /// Load an `OpenAPI` spec from a string, using the path extension to determine format.
-pub fn load_spec_from_str(content: &str, path: &Path) -> Result<OpenApiSpec> {
+pub fn load_spec_from_str(content: &str, path: &Path) -> Result<OpenApiSpec, SpecError> {
     let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
     match ext {
-        "json" => serde_json::from_str(content)
-            .with_context(|| format!("failed to parse JSON spec: {}", path.display())),
-        "yaml" | "yml" => serde_yaml_ng::from_str(content)
-            .with_context(|| format!("failed to parse YAML spec: {}", path.display())),
-        _ => {
-            // Try JSON first, then YAML
-            serde_json::from_str(content)
-                .or_else(|_| serde_yaml_ng::from_str(content))
-                .with_context(|| {
-                    format!(
-                        "failed to parse spec (tried JSON and YAML): {}",
-                        path.display()
-                    )
-                })
+        "json" => serde_json::from_str(content).map_err(|source| SpecError::ParseJson {
+            path: path.to_path_buf(),
+            source,
+        }),
+        "yaml" | "yml" => {
+            serde_yaml_ng::from_str(content).map_err(|source| SpecError::ParseYaml {
+                path: path.to_path_buf(),
+                source,
+            })
         }
+        _ => serde_json::from_str(content).or_else(|json_error| {
+            serde_yaml_ng::from_str(content).map_err(|yaml_error| {
+                SpecError::ParseUnknownFormat {
+                    path: path.to_path_buf(),
+                    json_error,
+                    yaml_error,
+                }
+            })
+        }),
     }
 }
 
