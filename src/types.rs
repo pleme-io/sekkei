@@ -232,7 +232,6 @@ impl PathItem {
     /// Iterate over all defined operations in this path item as `(method, &Operation)` pairs.
     ///
     /// Methods are yielded in standard order: GET, POST, PUT, DELETE, PATCH.
-    #[must_use]
     pub fn operations(&self) -> impl Iterator<Item = (&'static str, &Operation)> {
         HTTP_METHODS
             .into_iter()

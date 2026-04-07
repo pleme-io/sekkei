@@ -15,6 +15,9 @@ pedantic = { level = "warn", priority = -1 }
 missing_errors_doc = "allow"
 missing_panics_doc = "allow"
 
+[features]
+test-support = []
+
 [dependencies]
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
