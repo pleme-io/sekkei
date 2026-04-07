@@ -4,8 +4,14 @@ use crate::error::SpecError;
 use crate::types::OpenApiSpec;
 
 /// Trait for loading `OpenAPI` specs from various sources.
+///
+/// Implementors must be thread-safe (`Send + Sync`).
 pub trait SpecLoader: Send + Sync {
     /// Load an `OpenAPI` spec from the given path.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SpecError`] if the file cannot be read or parsed.
     fn load(&self, path: &Path) -> Result<OpenApiSpec, SpecError>;
 }
 
