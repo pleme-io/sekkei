@@ -23,12 +23,18 @@ pub struct OpenApiSpec {
 // ── Info ───────────────────────────────────────────────────────────────────
 
 /// Metadata about the API (title, version, description).
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Info {
     pub title: String,
     #[serde(default)]
     pub description: Option<String>,
     pub version: String,
+}
+
+impl std::fmt::Display for Info {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} v{}", self.title, self.version)
+    }
 }
 
 // ── Paths & Operations ────────────────────────────────────────────────────
@@ -211,7 +217,7 @@ pub struct SecurityScheme {
 // ── Server ─────────────────────────────────────────────────────────────────
 
 /// An object representing a server.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Server {
     pub url: String,
     #[serde(default)]
@@ -1809,6 +1815,39 @@ paths:
     }
 
     // ── PathItem::operations() tests ────────────────────────────
+
+    // ── Display and PartialEq tests ─────────────────────────────
+
+    #[test]
+    fn info_display_format() {
+        let info = Info {
+            title: "Pet Store".to_string(),
+            description: None,
+            version: "2.0.0".to_string(),
+        };
+        assert_eq!(info.to_string(), "Pet Store v2.0.0");
+    }
+
+    #[test]
+    fn info_partial_eq() {
+        let a = Info {
+            title: "API".to_string(),
+            description: None,
+            version: "1.0".to_string(),
+        };
+        let b = a.clone();
+        assert_eq!(a, b);
+    }
+
+    #[test]
+    fn server_partial_eq() {
+        let a = Server {
+            url: "https://example.com".to_string(),
+            description: Some("prod".to_string()),
+        };
+        let b = a.clone();
+        assert_eq!(a, b);
+    }
 
     // ── Default trait tests ──────────────────────────────────────
 
