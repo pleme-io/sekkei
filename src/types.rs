@@ -34,7 +34,7 @@ pub struct Info {
 // ── Paths & Operations ────────────────────────────────────────────────────
 
 /// Describes the operations available on a single path.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct PathItem {
     #[serde(default)]
     pub get: Option<Operation>,
@@ -51,7 +51,7 @@ pub struct PathItem {
 }
 
 /// A single API operation on a path (e.g. GET, POST).
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Operation {
     #[serde(default)]
@@ -94,7 +94,7 @@ pub struct Parameter {
 // ── Request / Response Bodies ──────────────────────────────────────────────
 
 /// Describes a request body with content type mappings.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct RequestBody {
     #[serde(default)]
     pub required: bool,
@@ -108,14 +108,14 @@ pub struct RequestBody {
 }
 
 /// A media type (e.g. `application/json`) with an optional schema.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct MediaType {
     #[serde(default)]
     pub schema: Option<Schema>,
 }
 
 /// Describes a single response from an API operation.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Response {
     #[serde(default)]
     pub description: Option<String>,
@@ -1946,6 +1946,56 @@ paths:
     }
 
     // ── PathItem::operations() tests ────────────────────────────
+
+    // ── Default trait tests ──────────────────────────────────────
+
+    #[test]
+    fn path_item_default_has_no_operations() {
+        let item = PathItem::default();
+        assert!(item.get.is_none());
+        assert!(item.post.is_none());
+        assert!(item.put.is_none());
+        assert!(item.delete.is_none());
+        assert!(item.patch.is_none());
+        assert!(item.parameters.is_empty());
+        assert_eq!(item.operations().count(), 0);
+    }
+
+    #[test]
+    fn operation_default_has_empty_fields() {
+        let op = Operation::default();
+        assert!(op.operation_id.is_none());
+        assert!(op.summary.is_none());
+        assert!(op.description.is_none());
+        assert!(op.parameters.is_empty());
+        assert!(op.request_body.is_none());
+        assert!(op.responses.is_empty());
+        assert!(op.security.is_empty());
+        assert!(op.tags.is_empty());
+    }
+
+    #[test]
+    fn request_body_default_is_empty() {
+        let body = RequestBody::default();
+        assert!(!body.required);
+        assert!(body.content.is_empty());
+        assert!(body.description.is_none());
+        assert!(body.ref_path.is_none());
+    }
+
+    #[test]
+    fn media_type_default_has_no_schema() {
+        let mt = MediaType::default();
+        assert!(mt.schema.is_none());
+    }
+
+    #[test]
+    fn response_default_is_empty() {
+        let resp = Response::default();
+        assert!(resp.description.is_none());
+        assert!(resp.content.is_none());
+        assert!(resp.ref_path.is_none());
+    }
 
     #[test]
     fn spec_all_operations_iterator() {
