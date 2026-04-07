@@ -218,6 +218,29 @@ pub struct Server {
     pub description: Option<String>,
 }
 
+// ── PathItem helpers ──────────────────────────────────────────────────
+
+const HTTP_METHODS: [&str; 5] = ["get", "post", "put", "delete", "patch"];
+
+impl PathItem {
+    /// Iterate over all defined operations in this path item as `(method, &Operation)` pairs.
+    ///
+    /// Methods are yielded in standard order: GET, POST, PUT, DELETE, PATCH.
+    #[must_use]
+    pub fn operations(&self) -> impl Iterator<Item = (&'static str, &Operation)> {
+        HTTP_METHODS
+            .into_iter()
+            .zip([
+                self.get.as_ref(),
+                self.post.as_ref(),
+                self.put.as_ref(),
+                self.delete.as_ref(),
+                self.patch.as_ref(),
+            ])
+            .filter_map(|(method, op)| op.map(|o| (method, o)))
+    }
+}
+
 // ── Schema helpers ────────────────────────────────────────────────────
 
 impl Schema {
@@ -1922,5 +1945,63 @@ paths:
         let spec: OpenApiSpec = serde_yaml_ng::from_str(yaml).unwrap();
         let op = spec.paths["/items"].get.as_ref().unwrap();
         assert!(op.success_response_schema().is_none());
+    }
+
+    // ── PathItem::operations() tests ────────────────────────────
+
+    #[test]
+    fn path_item_operations_returns_defined_methods() {
+        let spec: OpenApiSpec = serde_yaml_ng::from_str(FULL_SPEC_YAML).unwrap();
+        let pets = &spec.paths["/pets"];
+        let methods: Vec<&str> = pets.operations().map(|(m, _)| m).collect();
+        assert_eq!(methods, vec!["get", "post"]);
+    }
+
+    #[test]
+    fn path_item_operations_empty_when_no_methods() {
+        let item = PathItem {
+            get: None,
+            post: None,
+            put: None,
+            delete: None,
+            patch: None,
+            parameters: vec![],
+        };
+        assert_eq!(item.operations().count(), 0);
+    }
+
+    #[test]
+    fn path_item_operations_all_five_methods() {
+        let yaml = r#"
+info:
+  title: AllMethods
+  version: "1.0.0"
+paths:
+  /resource:
+    get:
+      responses:
+        "200":
+          description: OK
+    post:
+      responses:
+        "201":
+          description: Created
+    put:
+      responses:
+        "200":
+          description: OK
+    delete:
+      responses:
+        "204":
+          description: Deleted
+    patch:
+      responses:
+        "200":
+          description: OK
+"#;
+        let spec: OpenApiSpec = serde_yaml_ng::from_str(yaml).unwrap();
+        let item = &spec.paths["/resource"];
+        let methods: Vec<&str> = item.operations().map(|(m, _)| m).collect();
+        assert_eq!(methods, vec!["get", "post", "put", "delete", "patch"]);
     }
 }
