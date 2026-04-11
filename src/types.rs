@@ -2065,4 +2065,868 @@ paths:
         let methods: Vec<&str> = item.operations().map(|(m, _)| m).collect();
         assert_eq!(methods, vec!["get", "post", "put", "delete", "patch"]);
     }
+
+    // ── Schema construction and serde roundtrip ─────────────────
+
+    #[test]
+    fn schema_programmatic_construction_roundtrip_string() {
+        let schema = Schema {
+            schema_type: Some("string".to_string()),
+            format: Some("date-time".to_string()),
+            description: Some("A timestamp".to_string()),
+            min_length: Some(1),
+            max_length: Some(64),
+            ..Default::default()
+        };
+        let json = serde_json::to_string(&schema).unwrap();
+        let roundtrip: Schema = serde_json::from_str(&json).unwrap();
+        assert_eq!(roundtrip.schema_type.as_deref(), Some("string"));
+        assert_eq!(roundtrip.format.as_deref(), Some("date-time"));
+        assert_eq!(roundtrip.description.as_deref(), Some("A timestamp"));
+        assert_eq!(roundtrip.min_length, Some(1));
+        assert_eq!(roundtrip.max_length, Some(64));
+    }
+
+    #[test]
+    fn schema_programmatic_construction_roundtrip_integer() {
+        let schema = Schema {
+            schema_type: Some("integer".to_string()),
+            format: Some("int32".to_string()),
+            minimum: Some(0.0),
+            maximum: Some(999.0),
+            default: Some(serde_json::Value::Number(42.into())),
+            ..Default::default()
+        };
+        let json = serde_json::to_string(&schema).unwrap();
+        let roundtrip: Schema = serde_json::from_str(&json).unwrap();
+        assert_eq!(roundtrip.schema_type.as_deref(), Some("integer"));
+        assert_eq!(roundtrip.format.as_deref(), Some("int32"));
+        assert_eq!(roundtrip.minimum, Some(0.0));
+        assert_eq!(roundtrip.maximum, Some(999.0));
+        assert_eq!(roundtrip.default.unwrap().as_i64(), Some(42));
+    }
+
+    #[test]
+    fn schema_programmatic_construction_roundtrip_number() {
+        let schema = Schema {
+            schema_type: Some("number".to_string()),
+            format: Some("double".to_string()),
+            ..Default::default()
+        };
+        let json = serde_json::to_string(&schema).unwrap();
+        let roundtrip: Schema = serde_json::from_str(&json).unwrap();
+        assert_eq!(roundtrip.schema_type.as_deref(), Some("number"));
+        assert_eq!(roundtrip.format.as_deref(), Some("double"));
+    }
+
+    #[test]
+    fn schema_programmatic_construction_roundtrip_boolean() {
+        let schema = Schema {
+            schema_type: Some("boolean".to_string()),
+            default: Some(serde_json::Value::Bool(true)),
+            ..Default::default()
+        };
+        let json = serde_json::to_string(&schema).unwrap();
+        let roundtrip: Schema = serde_json::from_str(&json).unwrap();
+        assert_eq!(roundtrip.schema_type.as_deref(), Some("boolean"));
+        assert_eq!(roundtrip.default.unwrap().as_bool(), Some(true));
+    }
+
+    #[test]
+    fn schema_programmatic_construction_roundtrip_array_with_ref_items() {
+        let schema = Schema {
+            schema_type: Some("array".to_string()),
+            items: Some(Box::new(Schema {
+                ref_path: Some("#/components/schemas/Item".to_string()),
+                ..Default::default()
+            })),
+            ..Default::default()
+        };
+        let json = serde_json::to_string(&schema).unwrap();
+        let roundtrip: Schema = serde_json::from_str(&json).unwrap();
+        assert!(roundtrip.is_array());
+        let items = roundtrip.items.as_ref().unwrap();
+        assert!(items.is_ref());
+        assert_eq!(items.ref_name(), Some("Item"));
+    }
+
+    #[test]
+    fn schema_programmatic_construction_roundtrip_object_with_properties() {
+        let mut props = BTreeMap::new();
+        props.insert(
+            "name".to_string(),
+            Schema {
+                schema_type: Some("string".to_string()),
+                ..Default::default()
+            },
+        );
+        props.insert(
+            "age".to_string(),
+            Schema {
+                schema_type: Some("integer".to_string()),
+                ..Default::default()
+            },
+        );
+        let schema = Schema {
+            schema_type: Some("object".to_string()),
+            properties: props,
+            required: vec!["name".to_string()],
+            ..Default::default()
+        };
+        let json = serde_json::to_string(&schema).unwrap();
+        let roundtrip: Schema = serde_json::from_str(&json).unwrap();
+        assert!(roundtrip.is_object());
+        assert_eq!(roundtrip.properties.len(), 2);
+        assert_eq!(roundtrip.required, vec!["name"]);
+        assert_eq!(
+            roundtrip.properties["name"].schema_type.as_deref(),
+            Some("string")
+        );
+        assert_eq!(
+            roundtrip.properties["age"].schema_type.as_deref(),
+            Some("integer")
+        );
+    }
+
+    #[test]
+    fn schema_programmatic_construction_roundtrip_nullable() {
+        let schema = Schema {
+            schema_type: Some("string".to_string()),
+            nullable: true,
+            ..Default::default()
+        };
+        let json = serde_json::to_string(&schema).unwrap();
+        let roundtrip: Schema = serde_json::from_str(&json).unwrap();
+        assert!(roundtrip.nullable);
+    }
+
+    #[test]
+    fn schema_programmatic_construction_roundtrip_enum() {
+        let schema = Schema {
+            schema_type: Some("string".to_string()),
+            enum_values: Some(vec![
+                serde_json::Value::String("active".to_string()),
+                serde_json::Value::String("inactive".to_string()),
+                serde_json::Value::String("pending".to_string()),
+            ]),
+            ..Default::default()
+        };
+        let json = serde_json::to_string(&schema).unwrap();
+        let roundtrip: Schema = serde_json::from_str(&json).unwrap();
+        assert!(roundtrip.is_enum());
+        let values = roundtrip.enum_values.unwrap();
+        assert_eq!(values.len(), 3);
+        assert_eq!(values[0].as_str(), Some("active"));
+    }
+
+    #[test]
+    fn schema_programmatic_construction_roundtrip_composition() {
+        let schema = Schema {
+            all_of: vec![
+                Schema {
+                    ref_path: Some("#/components/schemas/Base".to_string()),
+                    ..Default::default()
+                },
+                Schema {
+                    schema_type: Some("object".to_string()),
+                    properties: {
+                        let mut p = BTreeMap::new();
+                        p.insert(
+                            "extra".to_string(),
+                            Schema {
+                                schema_type: Some("string".to_string()),
+                                ..Default::default()
+                            },
+                        );
+                        p
+                    },
+                    ..Default::default()
+                },
+            ],
+            ..Default::default()
+        };
+        let json = serde_json::to_string(&schema).unwrap();
+        let roundtrip: Schema = serde_json::from_str(&json).unwrap();
+        assert!(roundtrip.is_composed());
+        assert_eq!(roundtrip.all_of.len(), 2);
+        assert!(roundtrip.all_of[0].is_ref());
+        assert!(roundtrip.all_of[1].is_object());
+    }
+
+    #[test]
+    fn schema_programmatic_construction_roundtrip_additional_properties() {
+        let schema = Schema {
+            schema_type: Some("object".to_string()),
+            additional_properties: Some(Box::new(Schema {
+                schema_type: Some("integer".to_string()),
+                ..Default::default()
+            })),
+            ..Default::default()
+        };
+        let json = serde_json::to_string(&schema).unwrap();
+        let roundtrip: Schema = serde_json::from_str(&json).unwrap();
+        let ap = roundtrip.additional_properties.as_ref().unwrap();
+        assert_eq!(ap.schema_type.as_deref(), Some("integer"));
+    }
+
+    // ── Header and cookie parameter types ───────────────────────
+
+    #[test]
+    fn parse_header_parameter() {
+        let yaml = r#"
+info:
+  title: HeaderParam
+  version: "1.0.0"
+paths:
+  /items:
+    get:
+      parameters:
+        - name: X-Request-ID
+          in: header
+          required: true
+          description: Unique request identifier
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: OK
+"#;
+        let spec: OpenApiSpec = serde_yaml_ng::from_str(yaml).unwrap();
+        let param = &spec.paths["/items"].get.as_ref().unwrap().parameters[0];
+        assert_eq!(param.name, "X-Request-ID");
+        assert_eq!(param.location, "header");
+        assert!(param.required);
+        assert_eq!(
+            param.description.as_deref(),
+            Some("Unique request identifier")
+        );
+        let schema = param.schema.as_ref().unwrap();
+        assert_eq!(schema.schema_type.as_deref(), Some("string"));
+        assert_eq!(schema.format.as_deref(), Some("uuid"));
+    }
+
+    #[test]
+    fn parse_cookie_parameter() {
+        let yaml = r#"
+info:
+  title: CookieParam
+  version: "1.0.0"
+paths:
+  /items:
+    get:
+      parameters:
+        - name: session_id
+          in: cookie
+          required: false
+          description: Session cookie
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+"#;
+        let spec: OpenApiSpec = serde_yaml_ng::from_str(yaml).unwrap();
+        let param = &spec.paths["/items"].get.as_ref().unwrap().parameters[0];
+        assert_eq!(param.name, "session_id");
+        assert_eq!(param.location, "cookie");
+        assert!(!param.required);
+        assert_eq!(param.description.as_deref(), Some("Session cookie"));
+    }
+
+    #[test]
+    fn parse_all_four_parameter_locations() {
+        let yaml = r#"
+info:
+  title: AllParamLocations
+  version: "1.0.0"
+paths:
+  /items/{id}:
+    get:
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: filter
+          in: query
+          schema:
+            type: string
+        - name: Authorization
+          in: header
+          schema:
+            type: string
+        - name: tracking
+          in: cookie
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+"#;
+        let spec: OpenApiSpec = serde_yaml_ng::from_str(yaml).unwrap();
+        let params = &spec.paths["/items/{id}"].get.as_ref().unwrap().parameters;
+        assert_eq!(params.len(), 4);
+        let locations: Vec<&str> = params.iter().map(|p| p.location.as_str()).collect();
+        assert_eq!(locations, vec!["path", "query", "header", "cookie"]);
+    }
+
+    // ── Schema format variants ──────────────────────────────────
+
+    #[test]
+    fn parse_schema_format_int32() {
+        let yaml = r#"
+info:
+  title: Formats
+  version: "1.0.0"
+paths: {}
+components:
+  schemas:
+    Int32Field:
+      type: integer
+      format: int32
+"#;
+        let spec: OpenApiSpec = serde_yaml_ng::from_str(yaml).unwrap();
+        let schema = &spec.components.as_ref().unwrap().schemas["Int32Field"];
+        assert_eq!(schema.format.as_deref(), Some("int32"));
+    }
+
+    #[test]
+    fn parse_schema_format_float() {
+        let yaml = r#"
+info:
+  title: Formats
+  version: "1.0.0"
+paths: {}
+components:
+  schemas:
+    FloatField:
+      type: number
+      format: float
+"#;
+        let spec: OpenApiSpec = serde_yaml_ng::from_str(yaml).unwrap();
+        let schema = &spec.components.as_ref().unwrap().schemas["FloatField"];
+        assert_eq!(schema.format.as_deref(), Some("float"));
+    }
+
+    #[test]
+    fn parse_schema_format_date_and_datetime() {
+        let yaml = r#"
+info:
+  title: Formats
+  version: "1.0.0"
+paths: {}
+components:
+  schemas:
+    DateField:
+      type: string
+      format: date
+    DateTimeField:
+      type: string
+      format: date-time
+"#;
+        let spec: OpenApiSpec = serde_yaml_ng::from_str(yaml).unwrap();
+        let components = spec.components.as_ref().unwrap();
+        assert_eq!(
+            components.schemas["DateField"].format.as_deref(),
+            Some("date")
+        );
+        assert_eq!(
+            components.schemas["DateTimeField"].format.as_deref(),
+            Some("date-time")
+        );
+    }
+
+    #[test]
+    fn parse_schema_format_byte_and_binary() {
+        let yaml = r#"
+info:
+  title: Formats
+  version: "1.0.0"
+paths: {}
+components:
+  schemas:
+    ByteField:
+      type: string
+      format: byte
+    BinaryField:
+      type: string
+      format: binary
+"#;
+        let spec: OpenApiSpec = serde_yaml_ng::from_str(yaml).unwrap();
+        let components = spec.components.as_ref().unwrap();
+        assert_eq!(
+            components.schemas["ByteField"].format.as_deref(),
+            Some("byte")
+        );
+        assert_eq!(
+            components.schemas["BinaryField"].format.as_deref(),
+            Some("binary")
+        );
+    }
+
+    #[test]
+    fn parse_schema_format_password() {
+        let yaml = r#"
+info:
+  title: Formats
+  version: "1.0.0"
+paths: {}
+components:
+  schemas:
+    PasswordField:
+      type: string
+      format: password
+"#;
+        let spec: OpenApiSpec = serde_yaml_ng::from_str(yaml).unwrap();
+        let schema = &spec.components.as_ref().unwrap().schemas["PasswordField"];
+        assert_eq!(schema.format.as_deref(), Some("password"));
+    }
+
+    // ── Ref resolution edge cases ───────────────────────────────
+
+    #[test]
+    fn ref_name_extracts_from_various_component_types() {
+        assert_eq!(ref_name("#/components/schemas/User"), "User");
+        assert_eq!(ref_name("#/components/parameters/PageSize"), "PageSize");
+        assert_eq!(
+            ref_name("#/components/requestBodies/CreateUser"),
+            "CreateUser"
+        );
+        assert_eq!(ref_name("#/components/responses/ErrorResponse"), "ErrorResponse");
+        assert_eq!(
+            ref_name("#/components/securitySchemes/BearerAuth"),
+            "BearerAuth"
+        );
+    }
+
+    #[test]
+    fn schema_ref_name_returns_none_for_non_ref() {
+        let s = Schema {
+            schema_type: Some("string".to_string()),
+            ..Default::default()
+        };
+        assert!(!s.is_ref());
+        assert_eq!(s.ref_name(), None);
+    }
+
+    #[test]
+    fn resolve_schema_ref_follows_simple_pointer() {
+        let yaml = r##"
+info:
+  title: RefResolve
+  version: "1.0.0"
+paths: {}
+components:
+  schemas:
+    Address:
+      type: object
+      properties:
+        street:
+          type: string
+        city:
+          type: string
+      required:
+        - street
+        - city
+"##;
+        let spec: OpenApiSpec = serde_yaml_ng::from_str(yaml).unwrap();
+        let address = spec
+            .resolve_schema_ref("#/components/schemas/Address")
+            .unwrap();
+        assert!(address.is_object());
+        assert_eq!(address.properties.len(), 2);
+        assert_eq!(address.required, vec!["street", "city"]);
+    }
+
+    // ── Operation with description ──────────────────────────────
+
+    #[test]
+    fn parse_operation_with_description() {
+        let yaml = r#"
+info:
+  title: DescTest
+  version: "1.0.0"
+paths:
+  /items:
+    get:
+      operationId: listItems
+      summary: List items
+      description: Returns a paginated list of all items in the system
+      responses:
+        "200":
+          description: OK
+"#;
+        let spec: OpenApiSpec = serde_yaml_ng::from_str(yaml).unwrap();
+        let op = spec.paths["/items"].get.as_ref().unwrap();
+        assert_eq!(
+            op.description.as_deref(),
+            Some("Returns a paginated list of all items in the system")
+        );
+    }
+
+    // ── RequestBody with description ────────────────────────────
+
+    #[test]
+    fn parse_request_body_with_description() {
+        let yaml = r#"
+info:
+  title: BodyDesc
+  version: "1.0.0"
+paths:
+  /items:
+    post:
+      requestBody:
+        description: The item to create
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        "201":
+          description: Created
+"#;
+        let spec: OpenApiSpec = serde_yaml_ng::from_str(yaml).unwrap();
+        let body = spec.paths["/items"]
+            .post
+            .as_ref()
+            .unwrap()
+            .request_body
+            .as_ref()
+            .unwrap();
+        assert_eq!(body.description.as_deref(), Some("The item to create"));
+    }
+
+    // ── Full spec roundtrip preserves all fields ────────────────
+
+    #[test]
+    fn roundtrip_preserves_enum_values() {
+        let spec: OpenApiSpec = serde_yaml_ng::from_str(FULL_SPEC_YAML).unwrap();
+        let json = serde_json::to_string(&spec).unwrap();
+        let roundtrip: OpenApiSpec = serde_json::from_str(&json).unwrap();
+        let status = &roundtrip.components.as_ref().unwrap().schemas["PetStatus"];
+        assert!(status.is_enum());
+        let values = status.enum_values.as_ref().unwrap();
+        assert_eq!(values.len(), 3);
+        assert_eq!(values[0].as_str(), Some("available"));
+        assert_eq!(values[1].as_str(), Some("pending"));
+        assert_eq!(values[2].as_str(), Some("sold"));
+    }
+
+    #[test]
+    fn roundtrip_preserves_parameter_details() {
+        let spec: OpenApiSpec = serde_yaml_ng::from_str(FULL_SPEC_YAML).unwrap();
+        let json = serde_json::to_string(&spec).unwrap();
+        let roundtrip: OpenApiSpec = serde_json::from_str(&json).unwrap();
+        let param = &roundtrip.paths["/pets"].get.as_ref().unwrap().parameters[0];
+        assert_eq!(param.name, "limit");
+        assert_eq!(param.location, "query");
+        assert!(!param.required);
+        let schema = param.schema.as_ref().unwrap();
+        assert_eq!(schema.schema_type.as_deref(), Some("integer"));
+        assert_eq!(schema.format.as_deref(), Some("int64"));
+    }
+
+    #[test]
+    fn roundtrip_preserves_request_body() {
+        let spec: OpenApiSpec = serde_yaml_ng::from_str(FULL_SPEC_YAML).unwrap();
+        let json = serde_json::to_string(&spec).unwrap();
+        let roundtrip: OpenApiSpec = serde_json::from_str(&json).unwrap();
+        let body = roundtrip.paths["/pets"]
+            .post
+            .as_ref()
+            .unwrap()
+            .request_body
+            .as_ref()
+            .unwrap();
+        assert!(body.required);
+        assert!(body.content.contains_key("application/json"));
+    }
+
+    #[test]
+    fn roundtrip_preserves_path_level_parameters() {
+        let spec: OpenApiSpec = serde_yaml_ng::from_str(FULL_SPEC_YAML).unwrap();
+        let json = serde_json::to_string(&spec).unwrap();
+        let roundtrip: OpenApiSpec = serde_json::from_str(&json).unwrap();
+        let params = &roundtrip.paths["/pets/{petId}"].parameters;
+        assert_eq!(params.len(), 1);
+        assert_eq!(params[0].name, "petId");
+        assert_eq!(params[0].location, "path");
+        assert!(params[0].required);
+    }
+
+    // ── Complex composition with refs in anyOf ──────────────────
+
+    #[test]
+    fn parse_any_of_with_refs() {
+        let yaml = r##"
+info:
+  title: AnyOfRefs
+  version: "1.0.0"
+paths: {}
+components:
+  schemas:
+    Cat:
+      type: object
+      properties:
+        meow:
+          type: boolean
+    Dog:
+      type: object
+      properties:
+        bark:
+          type: boolean
+    Pet:
+      anyOf:
+        - $ref: "#/components/schemas/Cat"
+        - $ref: "#/components/schemas/Dog"
+"##;
+        let spec: OpenApiSpec = serde_yaml_ng::from_str(yaml).unwrap();
+        let pet = &spec.components.as_ref().unwrap().schemas["Pet"];
+        assert!(pet.is_composed());
+        assert_eq!(pet.any_of.len(), 2);
+        assert!(pet.any_of[0].is_ref());
+        assert_eq!(pet.any_of[0].ref_name(), Some("Cat"));
+        assert!(pet.any_of[1].is_ref());
+        assert_eq!(pet.any_of[1].ref_name(), Some("Dog"));
+    }
+
+    #[test]
+    fn parse_one_of_with_discriminator_like_pattern() {
+        let yaml = r##"
+info:
+  title: OneOfDiscriminator
+  version: "1.0.0"
+paths: {}
+components:
+  schemas:
+    Circle:
+      type: object
+      required:
+        - radius
+      properties:
+        shape_type:
+          type: string
+        radius:
+          type: number
+    Square:
+      type: object
+      required:
+        - side
+      properties:
+        shape_type:
+          type: string
+        side:
+          type: number
+    Shape:
+      oneOf:
+        - $ref: "#/components/schemas/Circle"
+        - $ref: "#/components/schemas/Square"
+"##;
+        let spec: OpenApiSpec = serde_yaml_ng::from_str(yaml).unwrap();
+        let shape = &spec.components.as_ref().unwrap().schemas["Shape"];
+        assert!(shape.is_composed());
+        assert_eq!(shape.one_of.len(), 2);
+        assert_eq!(shape.one_of[0].ref_name(), Some("Circle"));
+        assert_eq!(shape.one_of[1].ref_name(), Some("Square"));
+        // Verify the referenced schemas resolve correctly
+        let circle = spec
+            .resolve_schema_ref("#/components/schemas/Circle")
+            .unwrap();
+        assert!(circle.is_object());
+        assert_eq!(circle.required, vec!["radius"]);
+    }
+
+    // ── Null/missing field edge cases ───────────────────────────
+
+    #[test]
+    fn schema_with_null_json_values_deserializes() {
+        let json = r#"{
+            "type": "object",
+            "format": null,
+            "description": null,
+            "title": null,
+            "default": null
+        }"#;
+        let schema: Schema = serde_json::from_str(json).unwrap();
+        assert!(schema.is_object());
+        assert!(schema.format.is_none());
+        assert!(schema.description.is_none());
+        assert!(schema.title.is_none());
+        assert!(schema.default.is_none());
+    }
+
+    #[test]
+    fn schema_from_empty_json_object() {
+        let schema: Schema = serde_json::from_str("{}").unwrap();
+        assert!(schema.schema_type.is_none());
+        assert!(schema.format.is_none());
+        assert!(schema.properties.is_empty());
+        assert!(schema.items.is_none());
+        assert!(schema.required.is_empty());
+        assert!(schema.enum_values.is_none());
+        assert!(schema.ref_path.is_none());
+        assert!(schema.all_of.is_empty());
+        assert!(schema.one_of.is_empty());
+        assert!(schema.any_of.is_empty());
+        assert!(!schema.nullable);
+        assert!(schema.additional_properties.is_none());
+        assert!(schema.title.is_none());
+    }
+
+    #[test]
+    fn operation_from_minimal_json() {
+        let json = r#"{"responses":{}}"#;
+        let op: Operation = serde_json::from_str(json).unwrap();
+        assert!(op.operation_id.is_none());
+        assert!(op.summary.is_none());
+        assert!(op.parameters.is_empty());
+        assert!(op.tags.is_empty());
+    }
+
+    // ── SecurityScheme apiKey type with cookie location ─────────
+
+    #[test]
+    fn parse_api_key_security_scheme_in_cookie() {
+        let yaml = r#"
+info:
+  title: CookieApiKey
+  version: "1.0.0"
+paths: {}
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: JSESSIONID
+      description: Session cookie authentication
+"#;
+        let spec: OpenApiSpec = serde_yaml_ng::from_str(yaml).unwrap();
+        let scheme = &spec.components.as_ref().unwrap().security_schemes["cookieAuth"];
+        assert_eq!(scheme.scheme_type, "apiKey");
+        assert_eq!(scheme.location.as_deref(), Some("cookie"));
+        assert_eq!(scheme.name.as_deref(), Some("JSESSIONID"));
+        assert_eq!(
+            scheme.description.as_deref(),
+            Some("Session cookie authentication")
+        );
+    }
+
+    // ── Spec with deeply nested refs across operations ──────────
+
+    #[test]
+    fn all_operations_with_refs_in_request_and_response() {
+        let yaml = r##"
+info:
+  title: RefOps
+  version: "1.0.0"
+paths:
+  /users:
+    get:
+      operationId: listUsers
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/User"
+    post:
+      operationId: createUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateUserRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+components:
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+    CreateUserRequest:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+"##;
+        let spec: OpenApiSpec = serde_yaml_ng::from_str(yaml).unwrap();
+        let ops: Vec<_> = spec.all_operations().collect();
+        assert_eq!(ops.len(), 2);
+
+        // GET response is array with $ref items
+        let get_op = ops.iter().find(|(m, _, _)| m == "get").unwrap();
+        let resp_schema = get_op.2.success_response_schema().unwrap();
+        assert!(resp_schema.is_array());
+        let items = resp_schema.items.as_ref().unwrap();
+        assert!(items.is_ref());
+        assert_eq!(items.ref_name(), Some("User"));
+
+        // POST request body is $ref
+        let post_op = ops.iter().find(|(m, _, _)| m == "post").unwrap();
+        let body_schema = post_op.2.json_body_schema().unwrap();
+        assert!(body_schema.is_ref());
+        assert_eq!(body_schema.ref_name(), Some("CreateUserRequest"));
+
+        // POST response is also $ref
+        let post_resp = post_op.2.success_response_schema().unwrap();
+        assert!(post_resp.is_ref());
+        assert_eq!(post_resp.ref_name(), Some("User"));
+
+        // Resolve the refs
+        let user = spec
+            .resolve_schema_ref("#/components/schemas/User")
+            .unwrap();
+        assert!(user.is_object());
+        assert_eq!(user.properties.len(), 2);
+    }
+
+    // ── Info PartialEq inequality ───────────────────────────────
+
+    #[test]
+    fn info_partial_eq_different_versions() {
+        let a = Info {
+            title: "API".to_string(),
+            description: None,
+            version: "1.0".to_string(),
+        };
+        let b = Info {
+            title: "API".to_string(),
+            description: None,
+            version: "2.0".to_string(),
+        };
+        assert_ne!(a, b);
+    }
+
+    #[test]
+    fn info_partial_eq_with_description() {
+        let a = Info {
+            title: "API".to_string(),
+            description: Some("desc".to_string()),
+            version: "1.0".to_string(),
+        };
+        let b = Info {
+            title: "API".to_string(),
+            description: None,
+            version: "1.0".to_string(),
+        };
+        assert_ne!(a, b);
+    }
 }
