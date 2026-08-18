@@ -1,7 +1,7 @@
 //! `SpecVisitor` trait and `walk_spec` for walking `OpenAPI` specs.
 
-use crate::types::{Operation, Parameter, PathItem, Schema};
 use crate::OpenApiSpec;
+use crate::types::{Operation, Parameter, PathItem, Schema};
 
 /// Visitor trait for walking `OpenAPI` specs.
 /// Implement specific methods to process only what you need.
@@ -61,10 +61,7 @@ mod tests {
             }
         }
         let spec: OpenApiSpec = serde_yaml_ng::from_str(FULL_SPEC_YAML).unwrap();
-        let mut counter = Counter {
-            ops: 0,
-            schemas: 0,
-        };
+        let mut counter = Counter { ops: 0, schemas: 0 };
         walk_spec(&spec, &mut counter);
         assert_eq!(counter.ops, 4); // listPets, createPet, getPet, deletePet
         assert_eq!(counter.schemas, 3); // Pet, PetStatus, CreatePetRequest
@@ -231,8 +228,16 @@ mod tests {
             entries: Vec::new(),
         };
         walk_spec(&spec, &mut collector);
-        assert!(collector.entries.contains(&("get".to_string(), "/pets".to_string())));
-        assert!(collector.entries.contains(&("post".to_string(), "/pets".to_string())));
+        assert!(
+            collector
+                .entries
+                .contains(&("get".to_string(), "/pets".to_string()))
+        );
+        assert!(
+            collector
+                .entries
+                .contains(&("post".to_string(), "/pets".to_string()))
+        );
         assert!(
             collector
                 .entries
@@ -283,7 +288,11 @@ mod tests {
         let spec: OpenApiSpec = serde_yaml_ng::from_str(FULL_SPEC_YAML).unwrap();
         let mut collector = SchemaTypeCollector { types: Vec::new() };
         walk_spec(&spec, &mut collector);
-        assert!(collector.types.contains(&("Pet".to_string(), Some("object".to_string()))));
+        assert!(
+            collector
+                .types
+                .contains(&("Pet".to_string(), Some("object".to_string())))
+        );
         assert!(
             collector
                 .types
@@ -389,9 +398,7 @@ paths:
           description: OK
 "#;
         let spec: OpenApiSpec = serde_yaml_ng::from_str(yaml).unwrap();
-        let mut tracker = OrderTracker {
-            events: Vec::new(),
-        };
+        let mut tracker = OrderTracker { events: Vec::new() };
         walk_spec(&spec, &mut tracker);
         assert_eq!(tracker.events[0], Event::Path("/a".to_string()));
         assert_eq!(
@@ -430,12 +437,18 @@ paths:
           description: OK
 "#;
         let spec: OpenApiSpec = serde_yaml_ng::from_str(yaml).unwrap();
-        let mut collector = DetailedParamCollector {
-            params: Vec::new(),
-        };
+        let mut collector = DetailedParamCollector { params: Vec::new() };
         walk_spec(&spec, &mut collector);
         assert_eq!(collector.params.len(), 2);
-        assert!(collector.params.contains(&("filter".to_string(), "query".to_string())));
-        assert!(collector.params.contains(&("id".to_string(), "path".to_string())));
+        assert!(
+            collector
+                .params
+                .contains(&("filter".to_string(), "query".to_string()))
+        );
+        assert!(
+            collector
+                .params
+                .contains(&("id".to_string(), "path".to_string()))
+        );
     }
 }

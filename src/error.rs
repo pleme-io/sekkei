@@ -82,8 +82,7 @@ mod tests {
 
     #[test]
     fn parse_json_error_display() {
-        let json_err = serde_json::from_str::<serde_json::Value>("{{bad}}")
-            .unwrap_err();
+        let json_err = serde_json::from_str::<serde_json::Value>("{{bad}}").unwrap_err();
         let err = SpecError::ParseJson {
             path: PathBuf::from("bad.json"),
             source: json_err,
@@ -95,8 +94,7 @@ mod tests {
 
     #[test]
     fn parse_yaml_error_display() {
-        let yaml_err = serde_yaml_ng::from_str::<serde_json::Value>(":\n  :\n    :")
-            .unwrap_err();
+        let yaml_err = serde_yaml_ng::from_str::<serde_json::Value>(":\n  :\n    :").unwrap_err();
         let err = SpecError::ParseYaml {
             path: PathBuf::from("bad.yaml"),
             source: yaml_err,
@@ -108,10 +106,8 @@ mod tests {
 
     #[test]
     fn parse_unknown_format_error_display() {
-        let json_err = serde_json::from_str::<serde_json::Value>("not json")
-            .unwrap_err();
-        let yaml_err = serde_yaml_ng::from_str::<serde_json::Value>(":\n  :\n    :")
-            .unwrap_err();
+        let json_err = serde_json::from_str::<serde_json::Value>("not json").unwrap_err();
+        let yaml_err = serde_yaml_ng::from_str::<serde_json::Value>(":\n  :\n    :").unwrap_err();
         let err = SpecError::ParseUnknownFormat {
             path: PathBuf::from("mystery.txt"),
             json_error: json_err,
@@ -150,8 +146,7 @@ mod tests {
 
     #[test]
     fn spec_error_path_on_parse_json() {
-        let json_err = serde_json::from_str::<serde_json::Value>("{{bad}}")
-            .unwrap_err();
+        let json_err = serde_json::from_str::<serde_json::Value>("{{bad}}").unwrap_err();
         let err = SpecError::ParseJson {
             path: PathBuf::from("bad.json"),
             source: json_err,
@@ -161,10 +156,8 @@ mod tests {
 
     #[test]
     fn spec_error_path_on_unknown_format() {
-        let json_err = serde_json::from_str::<serde_json::Value>("bad")
-            .unwrap_err();
-        let yaml_err = serde_yaml_ng::from_str::<serde_json::Value>(":\n  :")
-            .unwrap_err();
+        let json_err = serde_json::from_str::<serde_json::Value>("bad").unwrap_err();
+        let yaml_err = serde_yaml_ng::from_str::<serde_json::Value>(":\n  :").unwrap_err();
         let err = SpecError::ParseUnknownFormat {
             path: PathBuf::from("mystery.txt"),
             json_error: json_err,

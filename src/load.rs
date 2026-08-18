@@ -46,19 +46,15 @@ pub fn load_spec_from_str(content: &str, path: impl AsRef<Path>) -> Result<OpenA
             path: path.to_path_buf(),
             source,
         }),
-        "yaml" | "yml" => {
-            serde_yaml_ng::from_str(content).map_err(|source| SpecError::ParseYaml {
-                path: path.to_path_buf(),
-                source,
-            })
-        }
+        "yaml" | "yml" => serde_yaml_ng::from_str(content).map_err(|source| SpecError::ParseYaml {
+            path: path.to_path_buf(),
+            source,
+        }),
         _ => serde_json::from_str(content).or_else(|json_error| {
-            serde_yaml_ng::from_str(content).map_err(|yaml_error| {
-                SpecError::ParseUnknownFormat {
-                    path: path.to_path_buf(),
-                    json_error,
-                    yaml_error,
-                }
+            serde_yaml_ng::from_str(content).map_err(|yaml_error| SpecError::ParseUnknownFormat {
+                path: path.to_path_buf(),
+                json_error,
+                yaml_error,
             })
         }),
     }
