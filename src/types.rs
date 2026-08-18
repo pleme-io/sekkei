@@ -157,7 +157,7 @@ pub struct Response {
 
 /// The `type` keyword as written on the wire.
 ///
-/// OpenAPI 3.0 permits a single string. OpenAPI 3.1 (JSON Schema 2020-12) also
+/// `OpenAPI` 3.0 permits a single string. `OpenAPI` 3.1 (JSON Schema 2020-12) also
 /// permits an array of strings, which is how 3.1 spells nullability
 /// (`["string","null"]`). Both spellings deserialize here and re-serialize in
 /// the dialect they arrived in.
@@ -170,7 +170,7 @@ pub enum TypeKeyword {
     Many(Vec<String>),
 }
 
-/// An OpenAPI `discriminator` object.
+/// An `OpenAPI` `discriminator` object.
 ///
 /// Discord's spec declares none, so every union there must be classified by
 /// inference rather than by this hint; other specs do declare it.
@@ -342,12 +342,15 @@ struct RawSchema {
 
 /// Wire form of a schema: JSON Schema 2020-12 permits a bare boolean anywhere a
 /// schema is expected (`true` accepts anything, `false` accepts nothing), and
-/// OpenAPI inherits that — `additionalProperties: false` is the common spelling.
+/// `OpenAPI` inherits that — `additionalProperties: false` is the common spelling.
 #[derive(Deserialize)]
 #[serde(untagged)]
 enum SchemaWire {
     Bool(bool),
-    Object(RawSchema),
+    /// Boxed because the object form is two orders of magnitude larger than
+    /// the boolean one, and every schema in a document — nearly all of them
+    /// objects — would otherwise pay the enum's worst-case size.
+    Object(Box<RawSchema>),
 }
 
 #[allow(clippy::trivially_copy_pass_by_ref)]
@@ -492,7 +495,7 @@ impl<'de> Deserialize<'de> for Schema {
                 boolean_schema: Some(b),
                 ..Self::default()
             },
-            SchemaWire::Object(raw) => Self::from(raw),
+            SchemaWire::Object(raw) => Self::from(*raw),
         })
     }
 }
@@ -558,7 +561,7 @@ pub struct SecurityScheme {
     pub name: Option<String>,
     /// For oauth2 type: the declared flows and their scopes.
     ///
-    /// Previously dropped, which made every OAuth2 scope invisible — an SDK
+    /// Previously dropped, which made every `OAuth2` scope invisible — an SDK
     /// cannot emit a typed scope surface from a scheme it cannot see.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub flows: Option<OAuthFlows>,
@@ -578,7 +581,7 @@ pub struct OAuthFlows {
     pub authorization_code: Option<OAuthFlow>,
 }
 
-/// A single OAuth2 flow: its endpoints and the scopes it offers.
+/// A single `OAuth2` flow: its endpoints and the scopes it offers.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct OAuthFlow {

@@ -1,4 +1,4 @@
-//! OpenAPI 3.1 / JSON-Schema-2020-12 conformance corpus.
+//! `OpenAPI` 3.1 / `JSON-Schema-2020-12` conformance corpus.
 //!
 //! Every case here is a construct that a 3.1 document can contain and a 3.0-only
 //! parser gets wrong. The corpus is **inlined**, not read from a file on disk:
@@ -180,7 +180,7 @@ fn openapi_version_is_recorded() {
     assert_eq!(parse("{}").openapi.as_deref(), Some("3.1.0"));
 }
 
-/// An OAuth2 scheme's flows and scopes are what an SDK needs to emit a typed
+/// An `OAuth2` scheme's flows and scopes are what an SDK needs to emit a typed
 /// scope surface. They were dropped, which made every scope invisible.
 #[test]
 fn oauth2_flows_and_scopes_are_captured() {
