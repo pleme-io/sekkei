@@ -1,6 +1,6 @@
 [package]
 name = "sekkei"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2024"
 rust-version = "1.89.0"
 description = "Sekkei (設計) — canonical OpenAPI 3.0 serde types, multi-format loading, and ref resolution"
