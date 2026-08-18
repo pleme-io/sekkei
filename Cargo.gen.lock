@@ -1,8 +1,8 @@
 {
   "schema_version": 2,
-  "cargo_lock_sha256": "4fc20f63054f36bdf5fb4eaa06b65e240db493873eb2ef4093cf0048b42bba14",
+  "cargo_lock_sha256": "8cb5c866e5fc54e60e3ee3d339f15c13ffac749e7a9c1b5b964a02c12ace332c",
   "manifest_sha256": {
-    "Cargo.toml": "626ee04324fcb7d92413fe4de579c170737ff9b2453a36648ce267a9168d0110"
+    "Cargo.toml": "0b9b90e117cbfbfcfa2bfd104758dd7a668584e0e7aa1332f3e7df065610dd9a"
   },
   "target_resolves": {
     "base": {
@@ -272,7 +272,7 @@
         "build_dependencies": [],
         "features": []
       },
-      "sekkei-0.1.2": {
+      "sekkei-0.1.3": {
         "runtime_dependencies": [
           {
             "name": "serde",
@@ -1363,7 +1363,7 @@
     "ryu-1.0.23": {
       "edition": "2021"
     },
-    "sekkei-0.1.2": {
+    "sekkei-0.1.3": {
       "edition": "2024",
       "lib_target": {
         "name": "sekkei",
