@@ -6,9 +6,16 @@ use serde::{Deserialize, Serialize};
 
 // ── Root ───────────────────────────────────────────────────────────────────
 
-/// Root `OpenAPI` 3.0 specification object.
+/// Root `OpenAPI` specification object — 3.0 and 3.1.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OpenApiSpec {
+    /// The `openapi` version string, e.g. `"3.0.3"` or `"3.1.0"`.
+    ///
+    /// Optional because plenty of fixtures omit it, but recorded rather than
+    /// discarded: which dialect a document declares is the one fact a reader
+    /// needs to interpret `type` and nullability, and it used to be dropped.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub openapi: Option<String>,
     pub info: Info,
     #[serde(default)]
     pub paths: BTreeMap<String, PathItem>,
@@ -18,6 +25,20 @@ pub struct OpenApiSpec {
     pub servers: Vec<Server>,
     #[serde(default)]
     pub security: Vec<BTreeMap<String, Vec<String>>>,
+    #[serde(
+        rename = "externalDocs",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub external_docs: Option<ExternalDocs>,
+}
+
+/// A reference to external documentation.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ExternalDocs {
+    pub url: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
 }
 
 // ── Info ───────────────────────────────────────────────────────────────────
@@ -134,49 +155,356 @@ pub struct Response {
 
 // ── Schema ─────────────────────────────────────────────────────────────────
 
-/// JSON Schema object used to describe data types in `OpenAPI` specs.
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+/// The `type` keyword as written on the wire.
+///
+/// OpenAPI 3.0 permits a single string. OpenAPI 3.1 (JSON Schema 2020-12) also
+/// permits an array of strings, which is how 3.1 spells nullability
+/// (`["string","null"]`). Both spellings deserialize here and re-serialize in
+/// the dialect they arrived in.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum TypeKeyword {
+    /// A single type name — the 3.0 spelling, and the common 3.1 one.
+    One(String),
+    /// Several type names — 3.1 only.
+    Many(Vec<String>),
+}
+
+/// An OpenAPI `discriminator` object.
+///
+/// Discord's spec declares none, so every union there must be classified by
+/// inference rather than by this hint; other specs do declare it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
+pub struct Discriminator {
+    pub property_name: String,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub mapping: BTreeMap<String, String>,
+}
+
+/// JSON Schema object used to describe data types in `OpenAPI` specs.
+///
+/// `schema_type` carries the **normalized base type**: for 3.1's
+/// `type: ["string","null"]` it is `Some("string")` and [`Schema::nullable`] is
+/// `true`. Normalizing at the parse boundary is what lets every consumer keep
+/// reading one `Option<String>` across both dialects.
+///
+/// When `type` names more than one non-null type — a genuine multi-type union
+/// that a single base cannot represent — `schema_type` is `None` and the names
+/// live in [`Schema::type_union`]. The parser refuses to pick one: a consumer
+/// must consult `type_union` rather than be handed a guess.
+#[derive(Debug, Clone, Default)]
 pub struct Schema {
-    #[serde(rename = "type", default)]
+    /// The single base type, with `"null"` stripped and folded into `nullable`.
+    /// `None` when `type` was absent, or named several non-null types.
     pub schema_type: Option<String>,
-    #[serde(default)]
+    /// Every type named by `type`, verbatim, including `"null"`. Empty unless
+    /// `type` was an array. Normalization must never lose what was written.
+    pub type_union: Vec<String>,
     pub format: Option<String>,
-    #[serde(default)]
     pub description: Option<String>,
-    #[serde(default)]
     pub properties: BTreeMap<String, Schema>,
-    #[serde(default)]
     pub items: Option<Box<Schema>>,
-    #[serde(default)]
     pub required: Vec<String>,
-    #[serde(rename = "enum", default)]
     pub enum_values: Option<Vec<serde_json::Value>>,
+    /// JSON Schema 2020-12 `const` — a one-value enum. Load-bearing for union
+    /// classification: a `oneOf` whose members are all `const` is an enum, and
+    /// a property with distinct `const`s across variants is a discriminator.
+    pub const_value: Option<serde_json::Value>,
     /// $ref pointer, e.g. "#/components/schemas/Foo"
-    #[serde(rename = "$ref", default)]
     pub ref_path: Option<String>,
-    #[serde(rename = "allOf", default)]
     pub all_of: Vec<Schema>,
-    #[serde(rename = "oneOf", default)]
     pub one_of: Vec<Schema>,
-    #[serde(rename = "anyOf", default)]
     pub any_of: Vec<Schema>,
-    #[serde(default)]
+    pub discriminator: Option<Discriminator>,
     pub default: Option<serde_json::Value>,
-    #[serde(default)]
     pub minimum: Option<f64>,
-    #[serde(default)]
     pub maximum: Option<f64>,
-    #[serde(rename = "minLength", default)]
     pub min_length: Option<u64>,
-    #[serde(rename = "maxLength", default)]
     pub max_length: Option<u64>,
-    #[serde(default)]
+    pub pattern: Option<String>,
+    pub min_items: Option<u64>,
+    pub max_items: Option<u64>,
+    pub unique_items: bool,
+    pub min_properties: Option<u64>,
+    pub max_properties: Option<u64>,
+    /// JSON Schema 2020-12 `contentEncoding` (e.g. `base64` for file uploads).
+    pub content_encoding: Option<String>,
+    /// True when 3.0 wrote `nullable: true` **or** 3.1 put `"null"` in `type`.
     pub nullable: bool,
-    #[serde(default)]
+    /// The value schema for additional properties — i.e. this schema is a map.
+    ///
+    /// `None` when `additionalProperties` was absent **or** written as a bare
+    /// boolean; the boolean lands in [`Schema::additional_properties_allowed`]
+    /// instead. That split keeps `additional_properties.is_some()` meaning
+    /// exactly "there is a value schema", so a consumer detecting maps cannot
+    /// mistake `additionalProperties: false` — which forbids them — for one.
     pub additional_properties: Option<Box<Schema>>,
-    #[serde(default)]
+    /// The bare-boolean form of `additionalProperties`: `Some(false)` forbids
+    /// them, `Some(true)` permits any. `None` when absent or given as a schema.
+    pub additional_properties_allowed: Option<bool>,
     pub title: Option<String>,
+    /// Set when this schema was written as a bare boolean rather than an object
+    /// — JSON Schema 2020-12 permits `true` (accept anything) and `false`
+    /// (accept nothing) anywhere a schema is expected.
+    pub boolean_schema: Option<bool>,
+    /// Every key this struct does not model, captured verbatim rather than
+    /// dropped — vendor extensions (`x-*`) and any keyword not yet modelled.
+    ///
+    /// Capturing beats rejecting here: a vendor extension can change the
+    /// *meaning* of a construct, so discarding it silently produces a
+    /// confidently wrong reading. Discord's `x-discord-union: oneOf` marks its
+    /// 16 `anyOf` sites as exclusive unions — dropped, all 16 mistype as
+    /// inclusive. Use [`Schema::unmodelled_keywords`] to gate on drift.
+    pub extensions: BTreeMap<String, serde_json::Value>,
+}
+
+/// Wire shape for [`Schema`]. Exists so `type` can be a string or an array and
+/// so nullability lands in one field regardless of which dialect wrote it.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+struct RawSchema {
+    #[serde(rename = "type", default, skip_serializing_if = "Option::is_none")]
+    schema_type: Option<TypeKeyword>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    format: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    description: Option<String>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    properties: BTreeMap<String, Schema>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    items: Option<Box<Schema>>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    required: Vec<String>,
+    #[serde(rename = "enum", default, skip_serializing_if = "Option::is_none")]
+    enum_values: Option<Vec<serde_json::Value>>,
+    #[serde(rename = "const", default, skip_serializing_if = "Option::is_none")]
+    const_value: Option<serde_json::Value>,
+    #[serde(rename = "$ref", default, skip_serializing_if = "Option::is_none")]
+    ref_path: Option<String>,
+    #[serde(rename = "allOf", default, skip_serializing_if = "Vec::is_empty")]
+    all_of: Vec<Schema>,
+    #[serde(rename = "oneOf", default, skip_serializing_if = "Vec::is_empty")]
+    one_of: Vec<Schema>,
+    #[serde(rename = "anyOf", default, skip_serializing_if = "Vec::is_empty")]
+    any_of: Vec<Schema>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    discriminator: Option<Discriminator>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    default: Option<serde_json::Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    minimum: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    maximum: Option<f64>,
+    #[serde(rename = "minLength", default, skip_serializing_if = "Option::is_none")]
+    min_length: Option<u64>,
+    #[serde(rename = "maxLength", default, skip_serializing_if = "Option::is_none")]
+    max_length: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pattern: Option<String>,
+    #[serde(rename = "minItems", default, skip_serializing_if = "Option::is_none")]
+    min_items: Option<u64>,
+    #[serde(rename = "maxItems", default, skip_serializing_if = "Option::is_none")]
+    max_items: Option<u64>,
+    #[serde(rename = "uniqueItems", default, skip_serializing_if = "is_false")]
+    unique_items: bool,
+    #[serde(
+        rename = "minProperties",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    min_properties: Option<u64>,
+    #[serde(
+        rename = "maxProperties",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    max_properties: Option<u64>,
+    #[serde(
+        rename = "contentEncoding",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    content_encoding: Option<String>,
+    #[serde(default, skip_serializing_if = "is_false")]
+    nullable: bool,
+    #[serde(
+        rename = "additionalProperties",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    additional_properties: Option<Box<Schema>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    title: Option<String>,
+    /// Anything not named above, kept rather than dropped.
+    #[serde(flatten)]
+    extensions: BTreeMap<String, serde_json::Value>,
+}
+
+/// Wire form of a schema: JSON Schema 2020-12 permits a bare boolean anywhere a
+/// schema is expected (`true` accepts anything, `false` accepts nothing), and
+/// OpenAPI inherits that — `additionalProperties: false` is the common spelling.
+#[derive(Deserialize)]
+#[serde(untagged)]
+enum SchemaWire {
+    Bool(bool),
+    Object(RawSchema),
+}
+
+#[allow(clippy::trivially_copy_pass_by_ref)]
+fn is_false(b: &bool) -> bool {
+    !*b
+}
+
+/// The JSON Schema type name for "no value".
+const NULL_TYPE: &str = "null";
+
+impl From<RawSchema> for Schema {
+    fn from(raw: RawSchema) -> Self {
+        // Split the `type` keyword into a base type, the verbatim list, and a
+        // nullability bit, so 3.0 and 3.1 converge on one representation.
+        let (schema_type, type_union, null_in_type) = match raw.schema_type {
+            None => (None, Vec::new(), false),
+            Some(TypeKeyword::One(name)) => {
+                let is_null = name == NULL_TYPE;
+                (Some(name), Vec::new(), is_null)
+            }
+            Some(TypeKeyword::Many(names)) => {
+                let null_in_type = names.iter().any(|n| n == NULL_TYPE);
+                let mut non_null = names.iter().filter(|n| *n != NULL_TYPE);
+                let first = non_null.next().cloned();
+                // Exactly one non-null type collapses to a base type. Two or
+                // more is a real union: report `None` rather than guess.
+                let base = match non_null.next() {
+                    None => first,
+                    Some(_) => None,
+                };
+                (base, names, null_in_type)
+            }
+        };
+
+        // `additionalProperties` written as a bare boolean is a *permission*,
+        // not a value schema. Hoist it so `additional_properties.is_some()`
+        // keeps meaning "this is a map with this value type" — otherwise
+        // `additionalProperties: false`, which forbids extra keys, would read
+        // to every downstream map-detector as a map with an empty value schema.
+        let (additional_properties, additional_properties_allowed) = match raw.additional_properties
+        {
+            Some(s) if s.boolean_schema.is_some() => (None, s.boolean_schema),
+            other => (other, None),
+        };
+
+        Self {
+            schema_type,
+            type_union,
+            format: raw.format,
+            description: raw.description,
+            properties: raw.properties,
+            items: raw.items,
+            required: raw.required,
+            enum_values: raw.enum_values,
+            const_value: raw.const_value,
+            ref_path: raw.ref_path,
+            all_of: raw.all_of,
+            one_of: raw.one_of,
+            any_of: raw.any_of,
+            discriminator: raw.discriminator,
+            default: raw.default,
+            minimum: raw.minimum,
+            maximum: raw.maximum,
+            min_length: raw.min_length,
+            max_length: raw.max_length,
+            pattern: raw.pattern,
+            min_items: raw.min_items,
+            max_items: raw.max_items,
+            unique_items: raw.unique_items,
+            min_properties: raw.min_properties,
+            max_properties: raw.max_properties,
+            content_encoding: raw.content_encoding,
+            nullable: raw.nullable || null_in_type,
+            additional_properties,
+            additional_properties_allowed,
+            title: raw.title,
+            boolean_schema: None,
+            extensions: raw.extensions,
+        }
+    }
+}
+
+impl From<Schema> for RawSchema {
+    fn from(s: Schema) -> Self {
+        // Re-emit `type` in the dialect it arrived in: an array when the source
+        // wrote one, a bare string otherwise.
+        let schema_type = if s.type_union.is_empty() {
+            s.schema_type.map(TypeKeyword::One)
+        } else {
+            Some(TypeKeyword::Many(s.type_union.clone()))
+        };
+        // A 3.1 document spells nullability inside `type`; don't also emit the
+        // 3.0 `nullable` key and claim it twice.
+        let nullable = s.nullable && !s.type_union.iter().any(|n| n == NULL_TYPE);
+
+        Self {
+            schema_type,
+            format: s.format,
+            description: s.description,
+            properties: s.properties,
+            items: s.items,
+            required: s.required,
+            enum_values: s.enum_values,
+            const_value: s.const_value,
+            ref_path: s.ref_path,
+            all_of: s.all_of,
+            one_of: s.one_of,
+            any_of: s.any_of,
+            discriminator: s.discriminator,
+            default: s.default,
+            minimum: s.minimum,
+            maximum: s.maximum,
+            min_length: s.min_length,
+            max_length: s.max_length,
+            pattern: s.pattern,
+            min_items: s.min_items,
+            max_items: s.max_items,
+            unique_items: s.unique_items,
+            min_properties: s.min_properties,
+            max_properties: s.max_properties,
+            content_encoding: s.content_encoding,
+            nullable,
+            // Put a hoisted boolean permission back where it came from.
+            additional_properties: s.additional_properties.or_else(|| {
+                s.additional_properties_allowed.map(|b| {
+                    Box::new(Schema {
+                        boolean_schema: Some(b),
+                        ..Schema::default()
+                    })
+                })
+            }),
+            title: s.title,
+            extensions: s.extensions,
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for Schema {
+    fn deserialize<D: serde::Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
+        Ok(match SchemaWire::deserialize(d)? {
+            SchemaWire::Bool(b) => Self {
+                boolean_schema: Some(b),
+                ..Self::default()
+            },
+            SchemaWire::Object(raw) => Self::from(raw),
+        })
+    }
+}
+
+impl Serialize for Schema {
+    fn serialize<S: serde::Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
+        match self.boolean_schema {
+            // Re-emit a boolean schema as the bare boolean it was written as.
+            Some(b) => s.serialize_bool(b),
+            None => RawSchema::from(self.clone()).serialize(s),
+        }
+    }
 }
 
 // ── Components ─────────────────────────────────────────────────────────────
@@ -195,6 +523,22 @@ pub struct Components {
     pub request_bodies: BTreeMap<String, RequestBody>,
     #[serde(default)]
     pub responses: BTreeMap<String, Response>,
+    #[serde(default)]
+    pub headers: BTreeMap<String, Header>,
+}
+
+/// A reusable response/parameter header definition.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct Header {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub required: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub schema: Option<Schema>,
+    /// $ref pointer
+    #[serde(rename = "$ref", default, skip_serializing_if = "Option::is_none")]
+    pub ref_path: Option<String>,
 }
 
 /// Defines a security scheme that can be used by the operations.
@@ -212,6 +556,66 @@ pub struct SecurityScheme {
     /// For apiKey type: the header/query parameter name
     #[serde(default)]
     pub name: Option<String>,
+    /// For oauth2 type: the declared flows and their scopes.
+    ///
+    /// Previously dropped, which made every OAuth2 scope invisible — an SDK
+    /// cannot emit a typed scope surface from a scheme it cannot see.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub flows: Option<OAuthFlows>,
+}
+
+/// The `flows` object of an `oauth2` security scheme.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OAuthFlows {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub implicit: Option<OAuthFlow>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub password: Option<OAuthFlow>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub client_credentials: Option<OAuthFlow>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub authorization_code: Option<OAuthFlow>,
+}
+
+/// A single OAuth2 flow: its endpoints and the scopes it offers.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OAuthFlow {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub authorization_url: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub token_url: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub refresh_url: Option<String>,
+    /// Scope name → human description.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub scopes: BTreeMap<String, String>,
+}
+
+impl OAuthFlows {
+    /// Every flow declared, as `(flow name, flow)` pairs.
+    pub fn declared(&self) -> impl Iterator<Item = (&'static str, &OAuthFlow)> {
+        [
+            ("implicit", self.implicit.as_ref()),
+            ("password", self.password.as_ref()),
+            ("clientCredentials", self.client_credentials.as_ref()),
+            ("authorizationCode", self.authorization_code.as_ref()),
+        ]
+        .into_iter()
+        .filter_map(|(name, flow)| flow.map(|f| (name, f)))
+    }
+
+    /// The union of scope names across every declared flow.
+    ///
+    /// Flows usually offer overlapping scope sets; an SDK wants the whole
+    /// vocabulary once, not once per flow.
+    #[must_use]
+    pub fn all_scopes(&self) -> std::collections::BTreeSet<&str> {
+        self.declared()
+            .flat_map(|(_, f)| f.scopes.keys().map(String::as_str))
+            .collect()
+    }
 }
 
 // ── Server ─────────────────────────────────────────────────────────────────
@@ -304,6 +708,40 @@ impl Schema {
     #[must_use]
     pub fn ref_name(&self) -> Option<&str> {
         self.ref_path.as_deref().map(ref_name)
+    }
+
+    /// True when `type` named several non-null types, which no single base type
+    /// can represent. Consult [`Schema::type_union`] for the names.
+    #[must_use]
+    pub fn is_multi_type(&self) -> bool {
+        self.type_union.iter().filter(|n| *n != NULL_TYPE).count() > 1
+    }
+
+    /// True when this schema pins exactly one value via `const`.
+    #[must_use]
+    pub fn is_const(&self) -> bool {
+        self.const_value.is_some()
+    }
+
+    /// Look up a captured key that this struct does not model — a vendor
+    /// extension (`x-*`) or a keyword not yet given a field.
+    #[must_use]
+    pub fn extension(&self, key: &str) -> Option<&serde_json::Value> {
+        self.extensions.get(key)
+    }
+
+    /// Captured keys that are **not** vendor extensions — i.e. spec keywords
+    /// this struct does not model yet.
+    ///
+    /// This is the drift surface. A corpus gate asserts it is empty: when an
+    /// upstream spec starts using a keyword we do not model, the gate goes red
+    /// and names it, instead of the keyword being silently ignored. Vendor `x-*`
+    /// keys are excluded because carrying them unmodelled is the intent.
+    pub fn unmodelled_keywords(&self) -> impl Iterator<Item = &str> {
+        self.extensions
+            .keys()
+            .map(String::as_str)
+            .filter(|k| !k.starts_with("x-"))
     }
 }
 
@@ -401,15 +839,16 @@ impl OpenApiSpec {
     /// Returns the number of named schemas in `components.schemas`.
     #[must_use]
     pub fn schema_count(&self) -> usize {
-        self.components
-            .as_ref()
-            .map_or(0, |c| c.schemas.len())
+        self.components.as_ref().map_or(0, |c| c.schemas.len())
     }
 
     /// Returns the total number of operations across all paths.
     #[must_use]
     pub fn operation_count(&self) -> usize {
-        self.paths.values().map(|item| item.operations().count()).sum()
+        self.paths
+            .values()
+            .map(|item| item.operations().count())
+            .sum()
     }
 }
 
@@ -571,10 +1010,7 @@ mod tests {
     #[test]
     fn ref_name_extracts_last_segment() {
         assert_eq!(ref_name("#/components/schemas/Pet"), "Pet");
-        assert_eq!(
-            ref_name("#/components/parameters/LimitParam"),
-            "LimitParam"
-        );
+        assert_eq!(ref_name("#/components/parameters/LimitParam"), "LimitParam");
         assert_eq!(ref_name("#/components/requestBodies/PetBody"), "PetBody");
     }
 
@@ -801,8 +1237,10 @@ components:
         // Full spec has: GET /pets, POST /pets, GET /pets/{petId}, DELETE /pets/{petId}
         assert_eq!(ops.len(), 4);
 
-        let methods_and_paths: Vec<(&str, &str)> =
-            ops.iter().map(|(m, p, _)| (m.as_str(), p.as_str())).collect();
+        let methods_and_paths: Vec<(&str, &str)> = ops
+            .iter()
+            .map(|(m, p, _)| (m.as_str(), p.as_str()))
+            .collect();
         assert!(methods_and_paths.contains(&("get", "/pets")));
         assert!(methods_and_paths.contains(&("post", "/pets")));
         assert!(methods_and_paths.contains(&("get", "/pets/{petId}")));
@@ -1274,8 +1712,7 @@ paths:
     #[test]
     fn all_operations_empty_spec() {
         let spec: OpenApiSpec =
-            serde_yaml_ng::from_str("info:\n  title: E\n  version: '1'\npaths: {}")
-                .unwrap();
+            serde_yaml_ng::from_str("info:\n  title: E\n  version: '1'\npaths: {}").unwrap();
         assert!(all_operations(&spec).is_empty());
     }
 
@@ -1323,10 +1760,7 @@ paths:
         assert_eq!(from_yaml.info.title, "Pet Store");
         assert_eq!(from_yaml.info.version, "2.0.0");
         assert_eq!(from_yaml.paths.len(), 2);
-        assert_eq!(
-            from_yaml.components.as_ref().unwrap().schemas.len(),
-            3
-        );
+        assert_eq!(from_yaml.components.as_ref().unwrap().schemas.len(), 3);
     }
 
     #[test]
@@ -1364,7 +1798,10 @@ paths:
         let roundtrip: OpenApiSpec = serde_json::from_str(&json).unwrap();
         assert_eq!(spec.servers.len(), roundtrip.servers.len());
         assert_eq!(spec.servers[0].url, roundtrip.servers[0].url);
-        assert_eq!(spec.servers[0].description, roundtrip.servers[0].description);
+        assert_eq!(
+            spec.servers[0].description,
+            roundtrip.servers[0].description
+        );
     }
 
     #[test]
@@ -1462,9 +1899,13 @@ components:
       type: string
 "##;
         let spec: OpenApiSpec = serde_yaml_ng::from_str(yaml).unwrap();
-        let alias = spec.resolve_schema_ref("#/components/schemas/Alias").unwrap();
+        let alias = spec
+            .resolve_schema_ref("#/components/schemas/Alias")
+            .unwrap();
         assert!(alias.is_ref());
-        let real = spec.resolve_schema_ref("#/components/schemas/Real").unwrap();
+        let real = spec
+            .resolve_schema_ref("#/components/schemas/Real")
+            .unwrap();
         assert!(real.is_primitive());
     }
 
@@ -1479,10 +1920,22 @@ components:
   schemas: {}
 "#;
         let spec: OpenApiSpec = serde_yaml_ng::from_str(yaml).unwrap();
-        assert!(spec.resolve_schema_ref("#/components/schemas/Missing").is_none());
-        assert!(spec.resolve_parameter_ref("#/components/parameters/Missing").is_none());
-        assert!(spec.resolve_request_body_ref("#/components/requestBodies/Missing").is_none());
-        assert!(spec.resolve_response_ref("#/components/responses/Missing").is_none());
+        assert!(
+            spec.resolve_schema_ref("#/components/schemas/Missing")
+                .is_none()
+        );
+        assert!(
+            spec.resolve_parameter_ref("#/components/parameters/Missing")
+                .is_none()
+        );
+        assert!(
+            spec.resolve_request_body_ref("#/components/requestBodies/Missing")
+                .is_none()
+        );
+        assert!(
+            spec.resolve_response_ref("#/components/responses/Missing")
+                .is_none()
+        );
     }
 
     // ── Operation with operation-level security ──────────────────
@@ -1876,14 +2329,20 @@ paths:
     fn spec_display_format() {
         let spec: OpenApiSpec = serde_yaml_ng::from_str(FULL_SPEC_YAML).unwrap();
         let display = spec.to_string();
-        assert_eq!(display, "OpenAPI spec: Pet Store v2.0.0 (2 paths, 4 operations)");
+        assert_eq!(
+            display,
+            "OpenAPI spec: Pet Store v2.0.0 (2 paths, 4 operations)"
+        );
     }
 
     #[test]
     fn spec_display_minimal() {
         let spec: OpenApiSpec = serde_yaml_ng::from_str(MINIMAL_SPEC_YAML).unwrap();
         let display = spec.to_string();
-        assert_eq!(display, "OpenAPI spec: Test API v1.0.0 (0 paths, 0 operations)");
+        assert_eq!(
+            display,
+            "OpenAPI spec: Test API v1.0.0 (0 paths, 0 operations)"
+        );
     }
 
     #[test]
@@ -1972,8 +2431,10 @@ paths:
         let spec: OpenApiSpec = serde_yaml_ng::from_str(FULL_SPEC_YAML).unwrap();
         let ops: Vec<_> = spec.all_operations().collect();
         assert_eq!(ops.len(), 4);
-        let methods_and_paths: Vec<(&str, &str)> =
-            ops.iter().map(|(m, p, _)| (m.as_str(), p.as_str())).collect();
+        let methods_and_paths: Vec<(&str, &str)> = ops
+            .iter()
+            .map(|(m, p, _)| (m.as_str(), p.as_str()))
+            .collect();
         assert!(methods_and_paths.contains(&("get", "/pets")));
         assert!(methods_and_paths.contains(&("post", "/pets")));
         assert!(methods_and_paths.contains(&("get", "/pets/{petId}")));
@@ -2494,7 +2955,10 @@ components:
             ref_name("#/components/requestBodies/CreateUser"),
             "CreateUser"
         );
-        assert_eq!(ref_name("#/components/responses/ErrorResponse"), "ErrorResponse");
+        assert_eq!(
+            ref_name("#/components/responses/ErrorResponse"),
+            "ErrorResponse"
+        );
         assert_eq!(
             ref_name("#/components/securitySchemes/BearerAuth"),
             "BearerAuth"
