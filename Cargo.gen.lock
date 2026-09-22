@@ -1,19 +1,19 @@
 {
   "schema_version": 2,
-  "cargo_lock_sha256": "d2bd25ddd6eb34b565c9e10dfa085b58c82ab7dffca86be71c25dee8e8675885",
+  "cargo_lock_sha256": "0b2faac1e1946091ab3e223fb7765168d8113f6cec777f9101fbf261999826ae",
   "manifest_sha256": {
-    "Cargo.toml": "77da37b7f8d0b5ee75f721bb9d86ff6613c9eb1d73985d9034d83f3a742bfb4f"
+    "Cargo.toml": "ebb5cc00cd6946bb5ea86ffd9cd0850381ea1f779a718f2dc0821c10e72c9c2c"
   },
   "target_resolves": {
     "base": {
-      "bitflags-2.13.1": {
+      "bitflags-2.13.2": {
         "runtime_dependencies": [],
         "build_dependencies": [],
         "features": [
           "std"
         ]
       },
-      "cfg-if-1.0.4": {
+      "cfg-if-1.0.5": {
         "runtime_dependencies": [],
         "build_dependencies": [],
         "features": []
@@ -74,7 +74,7 @@
         "runtime_dependencies": [
           {
             "name": "cfg_if",
-            "package_key": "cfg-if-1.0.4",
+            "package_key": "cfg-if-1.0.5",
             "kind": "normal",
             "features": [],
             "uses_default_features": true,
@@ -171,7 +171,7 @@
         "build_dependencies": [],
         "features": []
       },
-      "indexmap-2.14.0": {
+      "indexmap-2.14.2": {
         "runtime_dependencies": [
           {
             "name": "equivalent",
@@ -233,7 +233,7 @@
         "runtime_dependencies": [
           {
             "name": "unicode_ident",
-            "package_key": "unicode-ident-1.0.24",
+            "package_key": "unicode-ident-1.0.26",
             "kind": "normal",
             "features": [],
             "uses_default_features": true,
@@ -272,7 +272,7 @@
         "build_dependencies": [],
         "features": []
       },
-      "sekkei-0.2.0": {
+      "sekkei-0.2.1": {
         "runtime_dependencies": [
           {
             "name": "serde",
@@ -389,7 +389,7 @@
           },
           {
             "name": "syn",
-            "package_key": "syn-3.0.3",
+            "package_key": "syn-3.0.6",
             "kind": "normal",
             "features": [
               "clone-impls",
@@ -462,7 +462,7 @@
         "runtime_dependencies": [
           {
             "name": "indexmap",
-            "package_key": "indexmap-2.14.0",
+            "package_key": "indexmap-2.14.2",
             "kind": "normal",
             "features": [],
             "uses_default_features": true,
@@ -514,7 +514,7 @@
         "build_dependencies": [],
         "features": []
       },
-      "syn-3.0.3": {
+      "syn-3.0.6": {
         "runtime_dependencies": [
           {
             "name": "proc_macro2",
@@ -538,7 +538,7 @@
           },
           {
             "name": "unicode_ident",
-            "package_key": "unicode-ident-1.0.24",
+            "package_key": "unicode-ident-1.0.26",
             "kind": "normal",
             "features": [],
             "uses_default_features": true,
@@ -593,7 +593,7 @@
           },
           {
             "name": "rustix",
-            "package_key": "rustix-1.1.4",
+            "package_key": "rustix-1.1.5",
             "kind": "normal",
             "features": [
               "fs"
@@ -653,7 +653,7 @@
           },
           {
             "name": "syn",
-            "package_key": "syn-3.0.3",
+            "package_key": "syn-3.0.6",
             "kind": "normal",
             "features": [],
             "uses_default_features": true,
@@ -665,7 +665,7 @@
         "build_dependencies": [],
         "features": []
       },
-      "unicode-ident-1.0.24": {
+      "unicode-ident-1.0.26": {
         "runtime_dependencies": [],
         "build_dependencies": [],
         "features": []
@@ -684,11 +684,11 @@
     "targets": {
       "aarch64-apple-darwin": {
         "overrides": {
-          "rustix-1.1.4": {
+          "rustix-1.1.5": {
             "runtime_dependencies": [
               {
                 "name": "bitflags",
-                "package_key": "bitflags-2.13.1",
+                "package_key": "bitflags-2.13.2",
                 "kind": "normal",
                 "features": [],
                 "uses_default_features": false,
@@ -771,11 +771,11 @@
               "no_std"
             ]
           },
-          "rustix-1.1.4": {
+          "rustix-1.1.5": {
             "runtime_dependencies": [
               {
                 "name": "bitflags",
-                "package_key": "bitflags-2.13.1",
+                "package_key": "bitflags-2.13.2",
                 "kind": "normal",
                 "features": [],
                 "uses_default_features": false,
@@ -889,11 +889,11 @@
               "no_std"
             ]
           },
-          "rustix-1.1.4": {
+          "rustix-1.1.5": {
             "runtime_dependencies": [
               {
                 "name": "bitflags",
-                "package_key": "bitflags-2.13.1",
+                "package_key": "bitflags-2.13.2",
                 "kind": "normal",
                 "features": [],
                 "uses_default_features": false,
@@ -995,11 +995,11 @@
       },
       "x86_64-apple-darwin": {
         "overrides": {
-          "rustix-1.1.4": {
+          "rustix-1.1.5": {
             "runtime_dependencies": [
               {
                 "name": "bitflags",
-                "package_key": "bitflags-2.13.1",
+                "package_key": "bitflags-2.13.2",
                 "kind": "normal",
                 "features": [],
                 "uses_default_features": false,
@@ -1082,11 +1082,11 @@
               "no_std"
             ]
           },
-          "rustix-1.1.4": {
+          "rustix-1.1.5": {
             "runtime_dependencies": [
               {
                 "name": "bitflags",
-                "package_key": "bitflags-2.13.1",
+                "package_key": "bitflags-2.13.2",
                 "kind": "normal",
                 "features": [],
                 "uses_default_features": false,
@@ -1200,11 +1200,11 @@
               "no_std"
             ]
           },
-          "rustix-1.1.4": {
+          "rustix-1.1.5": {
             "runtime_dependencies": [
               {
                 "name": "bitflags",
-                "package_key": "bitflags-2.13.1",
+                "package_key": "bitflags-2.13.2",
                 "kind": "normal",
                 "features": [],
                 "uses_default_features": false,
@@ -1307,10 +1307,10 @@
     }
   },
   "per_crate": {
-    "bitflags-2.13.1": {
+    "bitflags-2.13.2": {
       "edition": "2021"
     },
-    "cfg-if-1.0.4": {
+    "cfg-if-1.0.5": {
       "edition": "2018"
     },
     "equivalent-1.0.2": {
@@ -1329,7 +1329,7 @@
     "hashbrown-0.17.1": {
       "edition": "2024"
     },
-    "indexmap-2.14.0": {
+    "indexmap-2.14.2": {
       "edition": "2024"
     },
     "itoa-1.0.18": {
@@ -1356,14 +1356,14 @@
       "edition": "2021",
       "build_script": "build.rs"
     },
-    "rustix-1.1.4": {
+    "rustix-1.1.5": {
       "edition": "2021",
       "build_script": "build.rs"
     },
     "ryu-1.0.23": {
       "edition": "2021"
     },
-    "sekkei-0.2.0": {
+    "sekkei-0.2.1": {
       "edition": "2024",
       "lib_target": {
         "name": "sekkei",
@@ -1389,7 +1389,7 @@
     "serde_yaml_ng-0.10.0": {
       "edition": "2021"
     },
-    "syn-3.0.3": {
+    "syn-3.0.6": {
       "edition": "2021"
     },
     "tempfile-3.27.0": {
@@ -1403,7 +1403,7 @@
       "edition": "2021",
       "proc_macro": true
     },
-    "unicode-ident-1.0.24": {
+    "unicode-ident-1.0.26": {
       "edition": "2021"
     },
     "unsafe-libyaml-0.2.11": {
