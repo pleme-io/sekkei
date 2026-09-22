@@ -97,6 +97,13 @@ pub struct Operation {
     pub security: Vec<BTreeMap<String, Vec<String>>>,
     #[serde(default)]
     pub tags: Vec<String>,
+    /// Every key this struct does not model, captured verbatim rather than
+    /// dropped — vendor extensions (`x-*`) and any keyword not yet modelled,
+    /// exactly as [`Schema::extensions`] keeps them. An operation's vendor
+    /// extensions are how a spec says what no `OpenAPI` keyword can: a CLI
+    /// spelling, an authority tier, a confirmation gate.
+    #[serde(flatten)]
+    pub extensions: BTreeMap<String, serde_json::Value>,
 }
 
 // ── Parameters ─────────────────────────────────────────────────────────────
@@ -751,6 +758,22 @@ impl Schema {
 // ── Operation helpers ─────────────────────────────────────────────────
 
 impl Operation {
+    /// The vendor extension `name` (`x-…`), if the operation carries it.
+    #[must_use]
+    pub fn extension(&self, name: &str) -> Option<&serde_json::Value> {
+        self.extensions.get(name)
+    }
+
+    /// Keys this struct does not model that are NOT vendor extensions —
+    /// `OpenAPI` keywords sekkei does not read yet. Non-empty means the spec
+    /// says something a reader of this struct cannot see.
+    pub fn unmodelled_keywords(&self) -> impl Iterator<Item = &str> {
+        self.extensions
+            .keys()
+            .map(String::as_str)
+            .filter(|k| !k.starts_with("x-"))
+    }
+
     /// Get the JSON body schema from `request_body`, if any.
     #[must_use]
     pub fn json_body_schema(&self) -> Option<&Schema> {
@@ -1658,6 +1681,36 @@ paths:
     }
 
     // ── Operation helper tests ──────────────────────────────────
+
+    /// An operation's vendor extensions are kept, not dropped — structured
+    /// values included — and told apart from keywords sekkei does not model.
+    #[test]
+    fn operation_keeps_its_vendor_extensions() {
+        let op: Operation = serde_yaml_ng::from_str(
+            r"
+operationId: restartChild
+x-engenho-authority: mutate
+x-engenho-cli: {resource: children, verb: restart}
+deprecated: false
+",
+        )
+        .unwrap();
+        assert_eq!(
+            op.extension("x-engenho-cli"),
+            Some(&serde_json::json!({"resource": "children", "verb": "restart"}))
+        );
+        assert_eq!(
+            op.extension("x-engenho-authority"),
+            Some(&serde_json::json!("mutate"))
+        );
+        assert_eq!(op.extension("x-absent"), None);
+        assert_eq!(op.unmodelled_keywords().collect::<Vec<_>>(), ["deprecated"]);
+        assert!(
+            !op.extensions.contains_key("operationId"),
+            "a modelled key leaked into extensions"
+        );
+        assert!(Operation::default().extensions.is_empty());
+    }
 
     #[test]
     fn operation_json_body_schema() {
