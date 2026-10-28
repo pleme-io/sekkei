@@ -60,7 +60,7 @@ mod tests {
                 self.schemas += 1;
             }
         }
-        let spec: OpenApiSpec = serde_yaml_ng::from_str(FULL_SPEC_YAML).unwrap();
+        let spec: OpenApiSpec = serde_norway::from_str(FULL_SPEC_YAML).unwrap();
         let mut counter = Counter { ops: 0, schemas: 0 };
         walk_spec(&spec, &mut counter);
         assert_eq!(counter.ops, 4); // listPets, createPet, getPet, deletePet
@@ -77,7 +77,7 @@ mod tests {
                 self.paths += 1;
             }
         }
-        let spec: OpenApiSpec = serde_yaml_ng::from_str(FULL_SPEC_YAML).unwrap();
+        let spec: OpenApiSpec = serde_norway::from_str(FULL_SPEC_YAML).unwrap();
         let mut counter = PathCounter { paths: 0 };
         walk_spec(&spec, &mut counter);
         assert_eq!(counter.paths, 2); // /pets, /pets/{petId}
@@ -93,7 +93,7 @@ mod tests {
                 self.params += 1;
             }
         }
-        let spec: OpenApiSpec = serde_yaml_ng::from_str(FULL_SPEC_YAML).unwrap();
+        let spec: OpenApiSpec = serde_norway::from_str(FULL_SPEC_YAML).unwrap();
         let mut counter = ParamCounter { params: 0 };
         walk_spec(&spec, &mut counter);
         // 1 operation-level param (limit on GET /pets) + 1 path-level param (petId on /pets/{petId})
@@ -112,7 +112,7 @@ mod tests {
                 }
             }
         }
-        let spec: OpenApiSpec = serde_yaml_ng::from_str(FULL_SPEC_YAML).unwrap();
+        let spec: OpenApiSpec = serde_norway::from_str(FULL_SPEC_YAML).unwrap();
         let mut collector = IdCollector { ids: Vec::new() };
         walk_spec(&spec, &mut collector);
         assert!(collector.ids.contains(&"listPets".to_string()));
@@ -131,7 +131,7 @@ mod tests {
                 self.methods.push(method.to_string());
             }
         }
-        let spec: OpenApiSpec = serde_yaml_ng::from_str(FULL_SPEC_YAML).unwrap();
+        let spec: OpenApiSpec = serde_norway::from_str(FULL_SPEC_YAML).unwrap();
         let mut collector = MethodCollector {
             methods: Vec::new(),
         };
@@ -161,7 +161,7 @@ mod tests {
             }
         }
         let spec: OpenApiSpec =
-            serde_yaml_ng::from_str("info:\n  title: E\n  version: '1'\npaths: {}").unwrap();
+            serde_norway::from_str("info:\n  title: E\n  version: '1'\npaths: {}").unwrap();
         let mut counter = Counter { total: 0 };
         walk_spec(&spec, &mut counter);
         assert_eq!(counter.total, 0);
@@ -172,7 +172,7 @@ mod tests {
         // Verifies that the default no-op implementations don't panic.
         struct NoopVisitor;
         impl SpecVisitor for NoopVisitor {}
-        let spec: OpenApiSpec = serde_yaml_ng::from_str(FULL_SPEC_YAML).unwrap();
+        let spec: OpenApiSpec = serde_norway::from_str(FULL_SPEC_YAML).unwrap();
         let mut visitor = NoopVisitor;
         walk_spec(&spec, &mut visitor);
         // If we get here without panic, defaults are safe.
@@ -188,7 +188,7 @@ mod tests {
                 self.names.push(name.to_string());
             }
         }
-        let spec: OpenApiSpec = serde_yaml_ng::from_str(FULL_SPEC_YAML).unwrap();
+        let spec: OpenApiSpec = serde_norway::from_str(FULL_SPEC_YAML).unwrap();
         let mut collector = SchemaCollector { names: Vec::new() };
         walk_spec(&spec, &mut collector);
         assert!(collector.names.contains(&"Pet".to_string()));
@@ -206,7 +206,7 @@ mod tests {
                 self.paths.push(path.to_string());
             }
         }
-        let spec: OpenApiSpec = serde_yaml_ng::from_str(FULL_SPEC_YAML).unwrap();
+        let spec: OpenApiSpec = serde_norway::from_str(FULL_SPEC_YAML).unwrap();
         let mut collector = PathCollector { paths: Vec::new() };
         walk_spec(&spec, &mut collector);
         assert!(collector.paths.contains(&"/pets".to_string()));
@@ -223,7 +223,7 @@ mod tests {
                 self.entries.push((method.to_string(), path.to_string()));
             }
         }
-        let spec: OpenApiSpec = serde_yaml_ng::from_str(FULL_SPEC_YAML).unwrap();
+        let spec: OpenApiSpec = serde_norway::from_str(FULL_SPEC_YAML).unwrap();
         let mut collector = OpCollector {
             entries: Vec::new(),
         };
@@ -262,7 +262,7 @@ mod tests {
                 self.locations.push(param.location.clone());
             }
         }
-        let spec: OpenApiSpec = serde_yaml_ng::from_str(FULL_SPEC_YAML).unwrap();
+        let spec: OpenApiSpec = serde_norway::from_str(FULL_SPEC_YAML).unwrap();
         let mut collector = ParamCollector {
             names: Vec::new(),
             locations: Vec::new(),
@@ -285,7 +285,7 @@ mod tests {
                     .push((name.to_string(), schema.schema_type.clone()));
             }
         }
-        let spec: OpenApiSpec = serde_yaml_ng::from_str(FULL_SPEC_YAML).unwrap();
+        let spec: OpenApiSpec = serde_norway::from_str(FULL_SPEC_YAML).unwrap();
         let mut collector = SchemaTypeCollector { types: Vec::new() };
         walk_spec(&spec, &mut collector);
         assert!(
@@ -311,7 +311,7 @@ mod tests {
             }
         }
         let yaml = "info:\n  title: NoComp\n  version: '1'\npaths:\n  /test:\n    get:\n      responses:\n        '200':\n          description: OK";
-        let spec: OpenApiSpec = serde_yaml_ng::from_str(yaml).unwrap();
+        let spec: OpenApiSpec = serde_norway::from_str(yaml).unwrap();
         let mut counter = SchemaCounter { count: 0 };
         walk_spec(&spec, &mut counter);
         assert_eq!(counter.count, 0);
@@ -354,7 +354,7 @@ paths:
         "200":
           description: OK
 "#;
-        let spec: OpenApiSpec = serde_yaml_ng::from_str(yaml).unwrap();
+        let spec: OpenApiSpec = serde_norway::from_str(yaml).unwrap();
         let mut collector = MethodCollector {
             methods: Vec::new(),
         };
@@ -397,7 +397,7 @@ paths:
         "200":
           description: OK
 "#;
-        let spec: OpenApiSpec = serde_yaml_ng::from_str(yaml).unwrap();
+        let spec: OpenApiSpec = serde_norway::from_str(yaml).unwrap();
         let mut tracker = OrderTracker { events: Vec::new() };
         walk_spec(&spec, &mut tracker);
         assert_eq!(tracker.events[0], Event::Path("/a".to_string()));
@@ -436,7 +436,7 @@ paths:
         "200":
           description: OK
 "#;
-        let spec: OpenApiSpec = serde_yaml_ng::from_str(yaml).unwrap();
+        let spec: OpenApiSpec = serde_norway::from_str(yaml).unwrap();
         let mut collector = DetailedParamCollector { params: Vec::new() };
         walk_spec(&spec, &mut collector);
         assert_eq!(collector.params.len(), 2);

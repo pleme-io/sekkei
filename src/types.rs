@@ -885,7 +885,7 @@ mod tests {
 
     #[test]
     fn parse_minimal_yaml() {
-        let spec: OpenApiSpec = serde_yaml_ng::from_str(MINIMAL_SPEC_YAML).unwrap();
+        let spec: OpenApiSpec = serde_norway::from_str(MINIMAL_SPEC_YAML).unwrap();
         assert_eq!(spec.info.title, "Test API");
         assert_eq!(spec.info.version, "1.0.0");
         assert!(spec.paths.is_empty());
@@ -895,7 +895,7 @@ mod tests {
 
     #[test]
     fn parse_full_yaml() {
-        let spec: OpenApiSpec = serde_yaml_ng::from_str(FULL_SPEC_YAML).unwrap();
+        let spec: OpenApiSpec = serde_norway::from_str(FULL_SPEC_YAML).unwrap();
         assert_eq!(spec.info.title, "Pet Store");
         assert_eq!(
             spec.info.description.as_deref(),
@@ -911,7 +911,7 @@ mod tests {
 
     #[test]
     fn parse_path_item_methods() {
-        let spec: OpenApiSpec = serde_yaml_ng::from_str(FULL_SPEC_YAML).unwrap();
+        let spec: OpenApiSpec = serde_norway::from_str(FULL_SPEC_YAML).unwrap();
         let pets = &spec.paths["/pets"];
         assert!(pets.get.is_some());
         assert!(pets.post.is_some());
@@ -926,7 +926,7 @@ mod tests {
 
     #[test]
     fn parse_operation_fields() {
-        let spec: OpenApiSpec = serde_yaml_ng::from_str(FULL_SPEC_YAML).unwrap();
+        let spec: OpenApiSpec = serde_norway::from_str(FULL_SPEC_YAML).unwrap();
         let list_op = spec.paths["/pets"].get.as_ref().unwrap();
         assert_eq!(list_op.operation_id.as_deref(), Some("listPets"));
         assert_eq!(list_op.summary.as_deref(), Some("List all pets"));
@@ -938,7 +938,7 @@ mod tests {
 
     #[test]
     fn parse_parameters_with_schema() {
-        let spec: OpenApiSpec = serde_yaml_ng::from_str(FULL_SPEC_YAML).unwrap();
+        let spec: OpenApiSpec = serde_norway::from_str(FULL_SPEC_YAML).unwrap();
         let limit_param = &spec.paths["/pets"].get.as_ref().unwrap().parameters[0];
         let schema = limit_param.schema.as_ref().unwrap();
         assert_eq!(schema.schema_type.as_deref(), Some("integer"));
@@ -947,7 +947,7 @@ mod tests {
 
     #[test]
     fn parse_path_level_parameters() {
-        let spec: OpenApiSpec = serde_yaml_ng::from_str(FULL_SPEC_YAML).unwrap();
+        let spec: OpenApiSpec = serde_norway::from_str(FULL_SPEC_YAML).unwrap();
         let pet_item = &spec.paths["/pets/{petId}"];
         assert_eq!(pet_item.parameters.len(), 1);
         assert_eq!(pet_item.parameters[0].name, "petId");
@@ -957,7 +957,7 @@ mod tests {
 
     #[test]
     fn parse_request_body() {
-        let spec: OpenApiSpec = serde_yaml_ng::from_str(FULL_SPEC_YAML).unwrap();
+        let spec: OpenApiSpec = serde_norway::from_str(FULL_SPEC_YAML).unwrap();
         let create_op = spec.paths["/pets"].post.as_ref().unwrap();
         let body = create_op.request_body.as_ref().unwrap();
         assert!(body.required);
@@ -971,7 +971,7 @@ mod tests {
 
     #[test]
     fn parse_responses() {
-        let spec: OpenApiSpec = serde_yaml_ng::from_str(FULL_SPEC_YAML).unwrap();
+        let spec: OpenApiSpec = serde_norway::from_str(FULL_SPEC_YAML).unwrap();
         let get_op = spec.paths["/pets/{petId}"].get.as_ref().unwrap();
         assert!(get_op.responses.contains_key("200"));
         assert!(get_op.responses.contains_key("404"));
@@ -983,7 +983,7 @@ mod tests {
 
     #[test]
     fn parse_component_schemas() {
-        let spec: OpenApiSpec = serde_yaml_ng::from_str(FULL_SPEC_YAML).unwrap();
+        let spec: OpenApiSpec = serde_norway::from_str(FULL_SPEC_YAML).unwrap();
         let components = spec.components.as_ref().unwrap();
         assert!(components.schemas.contains_key("Pet"));
         assert!(components.schemas.contains_key("PetStatus"));
@@ -1000,7 +1000,7 @@ mod tests {
 
     #[test]
     fn parse_enum_schema() {
-        let spec: OpenApiSpec = serde_yaml_ng::from_str(FULL_SPEC_YAML).unwrap();
+        let spec: OpenApiSpec = serde_norway::from_str(FULL_SPEC_YAML).unwrap();
         let status = &spec.components.as_ref().unwrap().schemas["PetStatus"];
         assert_eq!(status.schema_type.as_deref(), Some("string"));
         let variants = status.enum_values.as_ref().unwrap();
@@ -1012,7 +1012,7 @@ mod tests {
 
     #[test]
     fn parse_security_schemes() {
-        let spec: OpenApiSpec = serde_yaml_ng::from_str(FULL_SPEC_YAML).unwrap();
+        let spec: OpenApiSpec = serde_norway::from_str(FULL_SPEC_YAML).unwrap();
         let schemes = &spec.components.as_ref().unwrap().security_schemes;
         assert!(schemes.contains_key("bearerAuth"));
         let bearer = &schemes["bearerAuth"];
@@ -1054,7 +1054,7 @@ mod tests {
 
     #[test]
     fn resolve_schema_ref_found() {
-        let spec: OpenApiSpec = serde_yaml_ng::from_str(FULL_SPEC_YAML).unwrap();
+        let spec: OpenApiSpec = serde_norway::from_str(FULL_SPEC_YAML).unwrap();
         let pet = spec.resolve_schema_ref("#/components/schemas/Pet");
         assert!(pet.is_some());
         assert_eq!(pet.unwrap().schema_type.as_deref(), Some("object"));
@@ -1062,7 +1062,7 @@ mod tests {
 
     #[test]
     fn resolve_schema_ref_not_found() {
-        let spec: OpenApiSpec = serde_yaml_ng::from_str(FULL_SPEC_YAML).unwrap();
+        let spec: OpenApiSpec = serde_norway::from_str(FULL_SPEC_YAML).unwrap();
         assert!(
             spec.resolve_schema_ref("#/components/schemas/Nonexistent")
                 .is_none()
@@ -1071,7 +1071,7 @@ mod tests {
 
     #[test]
     fn resolve_schema_ref_no_components() {
-        let spec: OpenApiSpec = serde_yaml_ng::from_str(MINIMAL_SPEC_YAML).unwrap();
+        let spec: OpenApiSpec = serde_norway::from_str(MINIMAL_SPEC_YAML).unwrap();
         assert!(
             spec.resolve_schema_ref("#/components/schemas/Anything")
                 .is_none()
@@ -1080,7 +1080,7 @@ mod tests {
 
     #[test]
     fn resolve_parameter_ref_found() {
-        let spec: OpenApiSpec = serde_yaml_ng::from_str(FULL_SPEC_YAML).unwrap();
+        let spec: OpenApiSpec = serde_norway::from_str(FULL_SPEC_YAML).unwrap();
         let param = spec.resolve_parameter_ref("#/components/parameters/LimitParam");
         assert!(param.is_some());
         assert_eq!(param.unwrap().name, "limit");
@@ -1088,7 +1088,7 @@ mod tests {
 
     #[test]
     fn resolve_parameter_ref_not_found() {
-        let spec: OpenApiSpec = serde_yaml_ng::from_str(FULL_SPEC_YAML).unwrap();
+        let spec: OpenApiSpec = serde_norway::from_str(FULL_SPEC_YAML).unwrap();
         assert!(
             spec.resolve_parameter_ref("#/components/parameters/Missing")
                 .is_none()
@@ -1097,7 +1097,7 @@ mod tests {
 
     #[test]
     fn resolve_request_body_ref_found() {
-        let spec: OpenApiSpec = serde_yaml_ng::from_str(FULL_SPEC_YAML).unwrap();
+        let spec: OpenApiSpec = serde_norway::from_str(FULL_SPEC_YAML).unwrap();
         let body = spec.resolve_request_body_ref("#/components/requestBodies/PetBody");
         assert!(body.is_some());
         assert!(body.unwrap().required);
@@ -1105,7 +1105,7 @@ mod tests {
 
     #[test]
     fn resolve_response_ref_found() {
-        let spec: OpenApiSpec = serde_yaml_ng::from_str(FULL_SPEC_YAML).unwrap();
+        let spec: OpenApiSpec = serde_norway::from_str(FULL_SPEC_YAML).unwrap();
         let resp = spec.resolve_response_ref("#/components/responses/NotFound");
         assert!(resp.is_some());
         assert_eq!(
@@ -1116,7 +1116,7 @@ mod tests {
 
     #[test]
     fn resolve_response_ref_not_found() {
-        let spec: OpenApiSpec = serde_yaml_ng::from_str(FULL_SPEC_YAML).unwrap();
+        let spec: OpenApiSpec = serde_norway::from_str(FULL_SPEC_YAML).unwrap();
         assert!(
             spec.resolve_response_ref("#/components/responses/Gone")
                 .is_none()
@@ -1149,7 +1149,7 @@ components:
         id:
           type: integer
 "##;
-        let spec: OpenApiSpec = serde_yaml_ng::from_str(yaml).unwrap();
+        let spec: OpenApiSpec = serde_norway::from_str(yaml).unwrap();
         let extended = &spec.components.as_ref().unwrap().schemas["Extended"];
         assert_eq!(extended.all_of.len(), 2);
         assert_eq!(
@@ -1174,7 +1174,7 @@ components:
           type: string
           nullable: true
 "#;
-        let spec: OpenApiSpec = serde_yaml_ng::from_str(yaml).unwrap();
+        let spec: OpenApiSpec = serde_norway::from_str(yaml).unwrap();
         let schema = &spec.components.as_ref().unwrap().schemas["NullableField"];
         assert!(schema.properties["value"].nullable);
     }
@@ -1193,7 +1193,7 @@ components:
       additionalProperties:
         type: string
 "#;
-        let spec: OpenApiSpec = serde_yaml_ng::from_str(yaml).unwrap();
+        let spec: OpenApiSpec = serde_norway::from_str(yaml).unwrap();
         let schema = &spec.components.as_ref().unwrap().schemas["FreeForm"];
         assert!(schema.additional_properties.is_some());
         let inner = schema.additional_properties.as_ref().unwrap();
@@ -1214,7 +1214,7 @@ components:
       items:
         type: string
 "#;
-        let spec: OpenApiSpec = serde_yaml_ng::from_str(yaml).unwrap();
+        let spec: OpenApiSpec = serde_norway::from_str(yaml).unwrap();
         let schema = &spec.components.as_ref().unwrap().schemas["StringList"];
         assert_eq!(schema.schema_type.as_deref(), Some("array"));
         let items = schema.items.as_ref().unwrap();
@@ -1223,7 +1223,7 @@ components:
 
     #[test]
     fn parse_servers() {
-        let spec: OpenApiSpec = serde_yaml_ng::from_str(FULL_SPEC_YAML).unwrap();
+        let spec: OpenApiSpec = serde_norway::from_str(FULL_SPEC_YAML).unwrap();
         assert_eq!(spec.servers.len(), 1);
         assert_eq!(spec.servers[0].url, "https://api.petstore.example.com/v2");
         assert_eq!(
@@ -1246,7 +1246,7 @@ components:
       in: header
       name: X-API-Key
 "#;
-        let spec: OpenApiSpec = serde_yaml_ng::from_str(yaml).unwrap();
+        let spec: OpenApiSpec = serde_norway::from_str(yaml).unwrap();
         let schemes = &spec.components.as_ref().unwrap().security_schemes;
         let key = &schemes["apiKey"];
         assert_eq!(key.scheme_type, "apiKey");
@@ -1258,7 +1258,7 @@ components:
 
     #[test]
     fn all_operations_returns_correct_tuples() {
-        let spec: OpenApiSpec = serde_yaml_ng::from_str(FULL_SPEC_YAML).unwrap();
+        let spec: OpenApiSpec = serde_norway::from_str(FULL_SPEC_YAML).unwrap();
         let ops = all_operations(&spec);
         // Full spec has: GET /pets, POST /pets, GET /pets/{petId}, DELETE /pets/{petId}
         assert_eq!(ops.len(), 4);
@@ -1275,14 +1275,14 @@ components:
 
     #[test]
     fn all_operations_empty_paths() {
-        let spec: OpenApiSpec = serde_yaml_ng::from_str(MINIMAL_SPEC_YAML).unwrap();
+        let spec: OpenApiSpec = serde_norway::from_str(MINIMAL_SPEC_YAML).unwrap();
         let ops = all_operations(&spec);
         assert!(ops.is_empty());
     }
 
     #[test]
     fn all_operations_preserves_operation_ids() {
-        let spec: OpenApiSpec = serde_yaml_ng::from_str(FULL_SPEC_YAML).unwrap();
+        let spec: OpenApiSpec = serde_norway::from_str(FULL_SPEC_YAML).unwrap();
         let ops = all_operations(&spec);
         let ids: Vec<Option<&str>> = ops
             .iter()
@@ -1298,7 +1298,7 @@ components:
 
     #[test]
     fn parse_global_security() {
-        let spec: OpenApiSpec = serde_yaml_ng::from_str(FULL_SPEC_YAML).unwrap();
+        let spec: OpenApiSpec = serde_norway::from_str(FULL_SPEC_YAML).unwrap();
         assert_eq!(spec.security.len(), 1);
         assert!(spec.security[0].contains_key("bearerAuth"));
         assert!(spec.security[0]["bearerAuth"].is_empty());
@@ -1320,7 +1320,7 @@ components:
       minimum: 1
       maximum: 100
 "#;
-        let spec: OpenApiSpec = serde_yaml_ng::from_str(yaml).unwrap();
+        let spec: OpenApiSpec = serde_norway::from_str(yaml).unwrap();
         let schema = &spec.components.as_ref().unwrap().schemas["Bounded"];
         assert_eq!(schema.minimum, Some(1.0));
         assert_eq!(schema.maximum, Some(100.0));
@@ -1340,7 +1340,7 @@ components:
       minLength: 3
       maxLength: 255
 "#;
-        let spec: OpenApiSpec = serde_yaml_ng::from_str(yaml).unwrap();
+        let spec: OpenApiSpec = serde_norway::from_str(yaml).unwrap();
         let schema = &spec.components.as_ref().unwrap().schemas["BoundedString"];
         assert_eq!(schema.min_length, Some(3));
         assert_eq!(schema.max_length, Some(255));
@@ -1359,7 +1359,7 @@ components:
       type: string
       default: "hello"
 "#;
-        let spec: OpenApiSpec = serde_yaml_ng::from_str(yaml).unwrap();
+        let spec: OpenApiSpec = serde_norway::from_str(yaml).unwrap();
         let schema = &spec.components.as_ref().unwrap().schemas["WithDefault"];
         assert_eq!(
             schema.default.as_ref().and_then(|v| v.as_str()),
@@ -1380,7 +1380,7 @@ components:
       type: object
       title: A Named Schema
 "#;
-        let spec: OpenApiSpec = serde_yaml_ng::from_str(yaml).unwrap();
+        let spec: OpenApiSpec = serde_norway::from_str(yaml).unwrap();
         let schema = &spec.components.as_ref().unwrap().schemas["Named"];
         assert_eq!(schema.title.as_deref(), Some("A Named Schema"));
     }
@@ -1399,7 +1399,7 @@ components:
         - type: string
         - type: integer
 "##;
-        let spec: OpenApiSpec = serde_yaml_ng::from_str(yaml).unwrap();
+        let spec: OpenApiSpec = serde_norway::from_str(yaml).unwrap();
         let schema = &spec.components.as_ref().unwrap().schemas["StringOrInt"];
         assert_eq!(schema.one_of.len(), 2);
         assert_eq!(schema.one_of[0].schema_type.as_deref(), Some("string"));
@@ -1420,7 +1420,7 @@ components:
         - type: string
         - type: number
 "##;
-        let spec: OpenApiSpec = serde_yaml_ng::from_str(yaml).unwrap();
+        let spec: OpenApiSpec = serde_norway::from_str(yaml).unwrap();
         let schema = &spec.components.as_ref().unwrap().schemas["Flexible"];
         assert_eq!(schema.any_of.len(), 2);
     }
@@ -1429,7 +1429,7 @@ components:
 
     #[test]
     fn parse_property_with_ref() {
-        let spec: OpenApiSpec = serde_yaml_ng::from_str(FULL_SPEC_YAML).unwrap();
+        let spec: OpenApiSpec = serde_norway::from_str(FULL_SPEC_YAML).unwrap();
         let pet = &spec.components.as_ref().unwrap().schemas["Pet"];
         let status_prop = &pet.properties["status"];
         assert_eq!(
@@ -1442,7 +1442,7 @@ components:
 
     #[test]
     fn parse_component_parameters() {
-        let spec: OpenApiSpec = serde_yaml_ng::from_str(FULL_SPEC_YAML).unwrap();
+        let spec: OpenApiSpec = serde_norway::from_str(FULL_SPEC_YAML).unwrap();
         let params = &spec.components.as_ref().unwrap().parameters;
         assert!(params.contains_key("LimitParam"));
         let limit = &params["LimitParam"];
@@ -1455,7 +1455,7 @@ components:
 
     #[test]
     fn parse_component_request_bodies() {
-        let spec: OpenApiSpec = serde_yaml_ng::from_str(FULL_SPEC_YAML).unwrap();
+        let spec: OpenApiSpec = serde_norway::from_str(FULL_SPEC_YAML).unwrap();
         let bodies = &spec.components.as_ref().unwrap().request_bodies;
         assert!(bodies.contains_key("PetBody"));
         let pet_body = &bodies["PetBody"];
@@ -1467,7 +1467,7 @@ components:
 
     #[test]
     fn parse_component_responses() {
-        let spec: OpenApiSpec = serde_yaml_ng::from_str(FULL_SPEC_YAML).unwrap();
+        let spec: OpenApiSpec = serde_norway::from_str(FULL_SPEC_YAML).unwrap();
         let responses = &spec.components.as_ref().unwrap().responses;
         assert!(responses.contains_key("NotFound"));
         assert_eq!(
@@ -1480,7 +1480,7 @@ components:
 
     #[test]
     fn roundtrip_json_serialization() {
-        let spec: OpenApiSpec = serde_yaml_ng::from_str(FULL_SPEC_YAML).unwrap();
+        let spec: OpenApiSpec = serde_norway::from_str(FULL_SPEC_YAML).unwrap();
         let json = serde_json::to_string(&spec).unwrap();
         let roundtrip: OpenApiSpec = serde_json::from_str(&json).unwrap();
         assert_eq!(roundtrip.info.title, spec.info.title);
@@ -1532,7 +1532,7 @@ paths:
         "200":
           description: OK
 "#;
-        let spec: OpenApiSpec = serde_yaml_ng::from_str(yaml).unwrap();
+        let spec: OpenApiSpec = serde_norway::from_str(yaml).unwrap();
         let op = spec.paths["/items"].get.as_ref().unwrap();
         assert_eq!(op.tags, vec!["items", "public"]);
     }
@@ -1686,7 +1686,7 @@ paths:
     /// values included — and told apart from keywords sekkei does not model.
     #[test]
     fn operation_keeps_its_vendor_extensions() {
-        let op: Operation = serde_yaml_ng::from_str(
+        let op: Operation = serde_norway::from_str(
             r"
 operationId: restartChild
 x-engenho-authority: mutate
@@ -1714,7 +1714,7 @@ deprecated: false
 
     #[test]
     fn operation_json_body_schema() {
-        let spec: OpenApiSpec = serde_yaml_ng::from_str(FULL_SPEC_YAML).unwrap();
+        let spec: OpenApiSpec = serde_norway::from_str(FULL_SPEC_YAML).unwrap();
         let post_op = spec.paths["/pets"].post.as_ref().unwrap();
         let body_schema = post_op.json_body_schema();
         assert!(body_schema.is_some());
@@ -1723,14 +1723,14 @@ deprecated: false
 
     #[test]
     fn operation_json_body_schema_none_when_no_body() {
-        let spec: OpenApiSpec = serde_yaml_ng::from_str(FULL_SPEC_YAML).unwrap();
+        let spec: OpenApiSpec = serde_norway::from_str(FULL_SPEC_YAML).unwrap();
         let get_op = spec.paths["/pets"].get.as_ref().unwrap();
         assert!(get_op.json_body_schema().is_none());
     }
 
     #[test]
     fn operation_success_response_200() {
-        let spec: OpenApiSpec = serde_yaml_ng::from_str(FULL_SPEC_YAML).unwrap();
+        let spec: OpenApiSpec = serde_norway::from_str(FULL_SPEC_YAML).unwrap();
         let get_op = spec.paths["/pets"].get.as_ref().unwrap();
         let resp_schema = get_op.success_response_schema();
         assert!(resp_schema.is_some());
@@ -1739,7 +1739,7 @@ deprecated: false
 
     #[test]
     fn operation_success_response_201() {
-        let spec: OpenApiSpec = serde_yaml_ng::from_str(FULL_SPEC_YAML).unwrap();
+        let spec: OpenApiSpec = serde_norway::from_str(FULL_SPEC_YAML).unwrap();
         let post_op = spec.paths["/pets"].post.as_ref().unwrap();
         let resp_schema = post_op.success_response_schema();
         assert!(resp_schema.is_some());
@@ -1748,7 +1748,7 @@ deprecated: false
 
     #[test]
     fn operation_success_response_none_when_no_content() {
-        let spec: OpenApiSpec = serde_yaml_ng::from_str(FULL_SPEC_YAML).unwrap();
+        let spec: OpenApiSpec = serde_norway::from_str(FULL_SPEC_YAML).unwrap();
         let delete_op = spec.paths["/pets/{petId}"].delete.as_ref().unwrap();
         assert!(delete_op.success_response_schema().is_none());
     }
@@ -1757,7 +1757,7 @@ deprecated: false
 
     #[test]
     fn all_operations_returns_correct_methods() {
-        let spec: OpenApiSpec = serde_yaml_ng::from_str(FULL_SPEC_YAML).unwrap();
+        let spec: OpenApiSpec = serde_norway::from_str(FULL_SPEC_YAML).unwrap();
         let ops = all_operations(&spec);
         let methods: Vec<&str> = ops.iter().map(|(m, _, _)| m.as_str()).collect();
         assert!(methods.contains(&"get"));
@@ -1768,7 +1768,7 @@ deprecated: false
     #[test]
     fn all_operations_empty_spec() {
         let spec: OpenApiSpec =
-            serde_yaml_ng::from_str("info:\n  title: E\n  version: '1'\npaths: {}").unwrap();
+            serde_norway::from_str("info:\n  title: E\n  version: '1'\npaths: {}").unwrap();
         assert!(all_operations(&spec).is_empty());
     }
 
@@ -1776,7 +1776,7 @@ deprecated: false
 
     #[test]
     fn parsed_schema_helpers_on_pet() {
-        let spec: OpenApiSpec = serde_yaml_ng::from_str(FULL_SPEC_YAML).unwrap();
+        let spec: OpenApiSpec = serde_norway::from_str(FULL_SPEC_YAML).unwrap();
         let pet = &spec.components.as_ref().unwrap().schemas["Pet"];
         assert!(pet.is_object());
         assert!(!pet.is_array());
@@ -1787,7 +1787,7 @@ deprecated: false
 
     #[test]
     fn parsed_schema_helpers_on_pet_status() {
-        let spec: OpenApiSpec = serde_yaml_ng::from_str(FULL_SPEC_YAML).unwrap();
+        let spec: OpenApiSpec = serde_norway::from_str(FULL_SPEC_YAML).unwrap();
         let status = &spec.components.as_ref().unwrap().schemas["PetStatus"];
         assert!(status.is_primitive());
         assert!(status.is_enum());
@@ -1796,7 +1796,7 @@ deprecated: false
 
     #[test]
     fn parsed_schema_helpers_on_ref_property() {
-        let spec: OpenApiSpec = serde_yaml_ng::from_str(FULL_SPEC_YAML).unwrap();
+        let spec: OpenApiSpec = serde_norway::from_str(FULL_SPEC_YAML).unwrap();
         let pet = &spec.components.as_ref().unwrap().schemas["Pet"];
         let status_prop = &pet.properties["status"];
         assert!(status_prop.is_ref());
@@ -1807,11 +1807,11 @@ deprecated: false
 
     #[test]
     fn roundtrip_yaml_to_json_to_yaml() {
-        let spec: OpenApiSpec = serde_yaml_ng::from_str(FULL_SPEC_YAML).unwrap();
+        let spec: OpenApiSpec = serde_norway::from_str(FULL_SPEC_YAML).unwrap();
         let json = serde_json::to_string_pretty(&spec).unwrap();
         let from_json: OpenApiSpec = serde_json::from_str(&json).unwrap();
-        let yaml_again = serde_yaml_ng::to_string(&from_json).unwrap();
-        let from_yaml: OpenApiSpec = serde_yaml_ng::from_str(&yaml_again).unwrap();
+        let yaml_again = serde_norway::to_string(&from_json).unwrap();
+        let from_yaml: OpenApiSpec = serde_norway::from_str(&yaml_again).unwrap();
 
         assert_eq!(from_yaml.info.title, "Pet Store");
         assert_eq!(from_yaml.info.version, "2.0.0");
@@ -1821,7 +1821,7 @@ deprecated: false
 
     #[test]
     fn roundtrip_preserves_all_operations() {
-        let spec: OpenApiSpec = serde_yaml_ng::from_str(FULL_SPEC_YAML).unwrap();
+        let spec: OpenApiSpec = serde_norway::from_str(FULL_SPEC_YAML).unwrap();
         let json = serde_json::to_string(&spec).unwrap();
         let roundtrip: OpenApiSpec = serde_json::from_str(&json).unwrap();
         let orig_ops = all_operations(&spec);
@@ -1836,7 +1836,7 @@ deprecated: false
 
     #[test]
     fn roundtrip_preserves_schema_fields() {
-        let spec: OpenApiSpec = serde_yaml_ng::from_str(FULL_SPEC_YAML).unwrap();
+        let spec: OpenApiSpec = serde_norway::from_str(FULL_SPEC_YAML).unwrap();
         let json = serde_json::to_string(&spec).unwrap();
         let roundtrip: OpenApiSpec = serde_json::from_str(&json).unwrap();
 
@@ -1849,7 +1849,7 @@ deprecated: false
 
     #[test]
     fn roundtrip_preserves_servers() {
-        let spec: OpenApiSpec = serde_yaml_ng::from_str(FULL_SPEC_YAML).unwrap();
+        let spec: OpenApiSpec = serde_norway::from_str(FULL_SPEC_YAML).unwrap();
         let json = serde_json::to_string(&spec).unwrap();
         let roundtrip: OpenApiSpec = serde_json::from_str(&json).unwrap();
         assert_eq!(spec.servers.len(), roundtrip.servers.len());
@@ -1862,7 +1862,7 @@ deprecated: false
 
     #[test]
     fn roundtrip_preserves_security() {
-        let spec: OpenApiSpec = serde_yaml_ng::from_str(FULL_SPEC_YAML).unwrap();
+        let spec: OpenApiSpec = serde_norway::from_str(FULL_SPEC_YAML).unwrap();
         let json = serde_json::to_string(&spec).unwrap();
         let roundtrip: OpenApiSpec = serde_json::from_str(&json).unwrap();
         assert_eq!(spec.security, roundtrip.security);
@@ -1890,7 +1890,7 @@ components:
               items:
                 type: string
 "#;
-        let spec: OpenApiSpec = serde_yaml_ng::from_str(yaml).unwrap();
+        let spec: OpenApiSpec = serde_norway::from_str(yaml).unwrap();
         let outer = &spec.components.as_ref().unwrap().schemas["Outer"];
         let inner = &outer.properties["inner"];
         assert!(inner.is_object());
@@ -1930,7 +1930,7 @@ components:
                 - admin
                 - user
 "##;
-        let spec: OpenApiSpec = serde_yaml_ng::from_str(yaml).unwrap();
+        let spec: OpenApiSpec = serde_norway::from_str(yaml).unwrap();
         let extended = &spec.components.as_ref().unwrap().schemas["Extended"];
         assert_eq!(extended.all_of.len(), 2);
         let override_part = &extended.all_of[1];
@@ -1954,7 +1954,7 @@ components:
     Real:
       type: string
 "##;
-        let spec: OpenApiSpec = serde_yaml_ng::from_str(yaml).unwrap();
+        let spec: OpenApiSpec = serde_norway::from_str(yaml).unwrap();
         let alias = spec
             .resolve_schema_ref("#/components/schemas/Alias")
             .unwrap();
@@ -1975,7 +1975,7 @@ paths: {}
 components:
   schemas: {}
 "#;
-        let spec: OpenApiSpec = serde_yaml_ng::from_str(yaml).unwrap();
+        let spec: OpenApiSpec = serde_norway::from_str(yaml).unwrap();
         assert!(
             spec.resolve_schema_ref("#/components/schemas/Missing")
                 .is_none()
@@ -2015,7 +2015,7 @@ paths:
         "200":
           description: OK
 "#;
-        let spec: OpenApiSpec = serde_yaml_ng::from_str(yaml).unwrap();
+        let spec: OpenApiSpec = serde_norway::from_str(yaml).unwrap();
         let op = spec.paths["/secure"].get.as_ref().unwrap();
         assert_eq!(op.security.len(), 2);
         assert!(op.security[0].contains_key("apiKey"));
@@ -2048,7 +2048,7 @@ paths:
         "200":
           description: OK
 "#;
-        let spec: OpenApiSpec = serde_yaml_ng::from_str(yaml).unwrap();
+        let spec: OpenApiSpec = serde_norway::from_str(yaml).unwrap();
         let body = spec.paths["/upload"]
             .post
             .as_ref()
@@ -2076,7 +2076,7 @@ paths:
         "200":
           description: OK
 "#;
-        let spec: OpenApiSpec = serde_yaml_ng::from_str(yaml).unwrap();
+        let spec: OpenApiSpec = serde_norway::from_str(yaml).unwrap();
         let op = spec.paths["/items"].get.as_ref().unwrap();
         assert!(op.operation_id.is_none());
         assert!(op.summary.is_none());
@@ -2108,7 +2108,7 @@ paths:
         "200":
           description: OK
 "#;
-        let spec: OpenApiSpec = serde_yaml_ng::from_str(yaml).unwrap();
+        let spec: OpenApiSpec = serde_norway::from_str(yaml).unwrap();
         let ops = all_operations(&spec);
         assert_eq!(ops.len(), 2);
         let methods: Vec<&str> = ops.iter().map(|(m, _, _)| m.as_str()).collect();
@@ -2136,7 +2136,7 @@ components:
       description: Must be between 1 and 100 chars
       nullable: true
 "#;
-        let spec: OpenApiSpec = serde_yaml_ng::from_str(yaml).unwrap();
+        let spec: OpenApiSpec = serde_norway::from_str(yaml).unwrap();
         let schema = &spec.components.as_ref().unwrap().schemas["ConstrainedString"];
         assert_eq!(schema.min_length, Some(1));
         assert_eq!(schema.max_length, Some(100));
@@ -2212,7 +2212,7 @@ components:
           schema:
             type: object
 "##;
-        let spec: OpenApiSpec = serde_yaml_ng::from_str(yaml).unwrap();
+        let spec: OpenApiSpec = serde_norway::from_str(yaml).unwrap();
         let body = spec.paths["/items"]
             .post
             .as_ref()
@@ -2245,7 +2245,7 @@ components:
     NotFound:
       description: Not found
 "##;
-        let spec: OpenApiSpec = serde_yaml_ng::from_str(yaml).unwrap();
+        let spec: OpenApiSpec = serde_norway::from_str(yaml).unwrap();
         let resp = &spec.paths["/items"].get.as_ref().unwrap().responses["404"];
         assert_eq!(
             resp.ref_path.as_deref(),
@@ -2269,7 +2269,7 @@ servers:
     description: Staging
   - url: http://localhost:8080
 "#;
-        let spec: OpenApiSpec = serde_yaml_ng::from_str(yaml).unwrap();
+        let spec: OpenApiSpec = serde_norway::from_str(yaml).unwrap();
         assert_eq!(spec.servers.len(), 3);
         assert_eq!(spec.servers[0].url, "https://prod.example.com");
         assert_eq!(spec.servers[2].url, "http://localhost:8080");
@@ -2280,7 +2280,7 @@ servers:
 
     #[test]
     fn info_without_description() {
-        let spec: OpenApiSpec = serde_yaml_ng::from_str(MINIMAL_SPEC_YAML).unwrap();
+        let spec: OpenApiSpec = serde_norway::from_str(MINIMAL_SPEC_YAML).unwrap();
         assert!(spec.info.description.is_none());
     }
 
@@ -2302,7 +2302,7 @@ components:
         items:
           type: integer
 "#;
-        let spec: OpenApiSpec = serde_yaml_ng::from_str(yaml).unwrap();
+        let spec: OpenApiSpec = serde_norway::from_str(yaml).unwrap();
         let map = &spec.components.as_ref().unwrap().schemas["Map"];
         let ap = map.additional_properties.as_ref().unwrap();
         assert!(ap.is_array());
@@ -2330,7 +2330,7 @@ paths:
         "201":
           description: Created
 "#;
-        let spec: OpenApiSpec = serde_yaml_ng::from_str(yaml).unwrap();
+        let spec: OpenApiSpec = serde_norway::from_str(yaml).unwrap();
         let op = spec.paths["/items"].post.as_ref().unwrap();
         assert!(op.json_body_schema().is_none());
     }
@@ -2354,7 +2354,7 @@ paths:
               schema:
                 type: string
 "#;
-        let spec: OpenApiSpec = serde_yaml_ng::from_str(yaml).unwrap();
+        let spec: OpenApiSpec = serde_norway::from_str(yaml).unwrap();
         let op = spec.paths["/items"].get.as_ref().unwrap();
         assert!(op.success_response_schema().is_none());
     }
@@ -2372,7 +2372,7 @@ paths:
         "404":
           description: Not found
 "#;
-        let spec: OpenApiSpec = serde_yaml_ng::from_str(yaml).unwrap();
+        let spec: OpenApiSpec = serde_norway::from_str(yaml).unwrap();
         let op = spec.paths["/items"].get.as_ref().unwrap();
         assert!(op.success_response_schema().is_none());
     }
@@ -2383,7 +2383,7 @@ paths:
 
     #[test]
     fn spec_display_format() {
-        let spec: OpenApiSpec = serde_yaml_ng::from_str(FULL_SPEC_YAML).unwrap();
+        let spec: OpenApiSpec = serde_norway::from_str(FULL_SPEC_YAML).unwrap();
         let display = spec.to_string();
         assert_eq!(
             display,
@@ -2393,7 +2393,7 @@ paths:
 
     #[test]
     fn spec_display_minimal() {
-        let spec: OpenApiSpec = serde_yaml_ng::from_str(MINIMAL_SPEC_YAML).unwrap();
+        let spec: OpenApiSpec = serde_norway::from_str(MINIMAL_SPEC_YAML).unwrap();
         let display = spec.to_string();
         assert_eq!(
             display,
@@ -2484,7 +2484,7 @@ paths:
 
     #[test]
     fn spec_all_operations_iterator() {
-        let spec: OpenApiSpec = serde_yaml_ng::from_str(FULL_SPEC_YAML).unwrap();
+        let spec: OpenApiSpec = serde_norway::from_str(FULL_SPEC_YAML).unwrap();
         let ops: Vec<_> = spec.all_operations().collect();
         assert_eq!(ops.len(), 4);
         let methods_and_paths: Vec<(&str, &str)> = ops
@@ -2499,37 +2499,37 @@ paths:
 
     #[test]
     fn spec_all_operations_empty() {
-        let spec: OpenApiSpec = serde_yaml_ng::from_str(MINIMAL_SPEC_YAML).unwrap();
+        let spec: OpenApiSpec = serde_norway::from_str(MINIMAL_SPEC_YAML).unwrap();
         assert_eq!(spec.all_operations().count(), 0);
     }
 
     #[test]
     fn spec_schema_count() {
-        let spec: OpenApiSpec = serde_yaml_ng::from_str(FULL_SPEC_YAML).unwrap();
+        let spec: OpenApiSpec = serde_norway::from_str(FULL_SPEC_YAML).unwrap();
         assert_eq!(spec.schema_count(), 3);
     }
 
     #[test]
     fn spec_schema_count_no_components() {
-        let spec: OpenApiSpec = serde_yaml_ng::from_str(MINIMAL_SPEC_YAML).unwrap();
+        let spec: OpenApiSpec = serde_norway::from_str(MINIMAL_SPEC_YAML).unwrap();
         assert_eq!(spec.schema_count(), 0);
     }
 
     #[test]
     fn spec_operation_count() {
-        let spec: OpenApiSpec = serde_yaml_ng::from_str(FULL_SPEC_YAML).unwrap();
+        let spec: OpenApiSpec = serde_norway::from_str(FULL_SPEC_YAML).unwrap();
         assert_eq!(spec.operation_count(), 4);
     }
 
     #[test]
     fn spec_operation_count_empty() {
-        let spec: OpenApiSpec = serde_yaml_ng::from_str(MINIMAL_SPEC_YAML).unwrap();
+        let spec: OpenApiSpec = serde_norway::from_str(MINIMAL_SPEC_YAML).unwrap();
         assert_eq!(spec.operation_count(), 0);
     }
 
     #[test]
     fn path_item_operations_returns_defined_methods() {
-        let spec: OpenApiSpec = serde_yaml_ng::from_str(FULL_SPEC_YAML).unwrap();
+        let spec: OpenApiSpec = serde_norway::from_str(FULL_SPEC_YAML).unwrap();
         let pets = &spec.paths["/pets"];
         let methods: Vec<&str> = pets.operations().map(|(m, _)| m).collect();
         assert_eq!(methods, vec!["get", "post"]);
@@ -2577,7 +2577,7 @@ paths:
         "200":
           description: OK
 "#;
-        let spec: OpenApiSpec = serde_yaml_ng::from_str(yaml).unwrap();
+        let spec: OpenApiSpec = serde_norway::from_str(yaml).unwrap();
         let item = &spec.paths["/resource"];
         let methods: Vec<&str> = item.operations().map(|(m, _)| m).collect();
         assert_eq!(methods, vec!["get", "post", "put", "delete", "patch"]);
@@ -2809,7 +2809,7 @@ paths:
         "200":
           description: OK
 "#;
-        let spec: OpenApiSpec = serde_yaml_ng::from_str(yaml).unwrap();
+        let spec: OpenApiSpec = serde_norway::from_str(yaml).unwrap();
         let param = &spec.paths["/items"].get.as_ref().unwrap().parameters[0];
         assert_eq!(param.name, "X-Request-ID");
         assert_eq!(param.location, "header");
@@ -2843,7 +2843,7 @@ paths:
         "200":
           description: OK
 "#;
-        let spec: OpenApiSpec = serde_yaml_ng::from_str(yaml).unwrap();
+        let spec: OpenApiSpec = serde_norway::from_str(yaml).unwrap();
         let param = &spec.paths["/items"].get.as_ref().unwrap().parameters[0];
         assert_eq!(param.name, "session_id");
         assert_eq!(param.location, "cookie");
@@ -2882,7 +2882,7 @@ paths:
         "200":
           description: OK
 "#;
-        let spec: OpenApiSpec = serde_yaml_ng::from_str(yaml).unwrap();
+        let spec: OpenApiSpec = serde_norway::from_str(yaml).unwrap();
         let params = &spec.paths["/items/{id}"].get.as_ref().unwrap().parameters;
         assert_eq!(params.len(), 4);
         let locations: Vec<&str> = params.iter().map(|p| p.location.as_str()).collect();
@@ -2904,7 +2904,7 @@ components:
       type: integer
       format: int32
 "#;
-        let spec: OpenApiSpec = serde_yaml_ng::from_str(yaml).unwrap();
+        let spec: OpenApiSpec = serde_norway::from_str(yaml).unwrap();
         let schema = &spec.components.as_ref().unwrap().schemas["Int32Field"];
         assert_eq!(schema.format.as_deref(), Some("int32"));
     }
@@ -2922,7 +2922,7 @@ components:
       type: number
       format: float
 "#;
-        let spec: OpenApiSpec = serde_yaml_ng::from_str(yaml).unwrap();
+        let spec: OpenApiSpec = serde_norway::from_str(yaml).unwrap();
         let schema = &spec.components.as_ref().unwrap().schemas["FloatField"];
         assert_eq!(schema.format.as_deref(), Some("float"));
     }
@@ -2943,7 +2943,7 @@ components:
       type: string
       format: date-time
 "#;
-        let spec: OpenApiSpec = serde_yaml_ng::from_str(yaml).unwrap();
+        let spec: OpenApiSpec = serde_norway::from_str(yaml).unwrap();
         let components = spec.components.as_ref().unwrap();
         assert_eq!(
             components.schemas["DateField"].format.as_deref(),
@@ -2971,7 +2971,7 @@ components:
       type: string
       format: binary
 "#;
-        let spec: OpenApiSpec = serde_yaml_ng::from_str(yaml).unwrap();
+        let spec: OpenApiSpec = serde_norway::from_str(yaml).unwrap();
         let components = spec.components.as_ref().unwrap();
         assert_eq!(
             components.schemas["ByteField"].format.as_deref(),
@@ -2996,7 +2996,7 @@ components:
       type: string
       format: password
 "#;
-        let spec: OpenApiSpec = serde_yaml_ng::from_str(yaml).unwrap();
+        let spec: OpenApiSpec = serde_norway::from_str(yaml).unwrap();
         let schema = &spec.components.as_ref().unwrap().schemas["PasswordField"];
         assert_eq!(schema.format.as_deref(), Some("password"));
     }
@@ -3051,7 +3051,7 @@ components:
         - street
         - city
 "##;
-        let spec: OpenApiSpec = serde_yaml_ng::from_str(yaml).unwrap();
+        let spec: OpenApiSpec = serde_norway::from_str(yaml).unwrap();
         let address = spec
             .resolve_schema_ref("#/components/schemas/Address")
             .unwrap();
@@ -3078,7 +3078,7 @@ paths:
         "200":
           description: OK
 "#;
-        let spec: OpenApiSpec = serde_yaml_ng::from_str(yaml).unwrap();
+        let spec: OpenApiSpec = serde_norway::from_str(yaml).unwrap();
         let op = spec.paths["/items"].get.as_ref().unwrap();
         assert_eq!(
             op.description.as_deref(),
@@ -3108,7 +3108,7 @@ paths:
         "201":
           description: Created
 "#;
-        let spec: OpenApiSpec = serde_yaml_ng::from_str(yaml).unwrap();
+        let spec: OpenApiSpec = serde_norway::from_str(yaml).unwrap();
         let body = spec.paths["/items"]
             .post
             .as_ref()
@@ -3123,7 +3123,7 @@ paths:
 
     #[test]
     fn roundtrip_preserves_enum_values() {
-        let spec: OpenApiSpec = serde_yaml_ng::from_str(FULL_SPEC_YAML).unwrap();
+        let spec: OpenApiSpec = serde_norway::from_str(FULL_SPEC_YAML).unwrap();
         let json = serde_json::to_string(&spec).unwrap();
         let roundtrip: OpenApiSpec = serde_json::from_str(&json).unwrap();
         let status = &roundtrip.components.as_ref().unwrap().schemas["PetStatus"];
@@ -3137,7 +3137,7 @@ paths:
 
     #[test]
     fn roundtrip_preserves_parameter_details() {
-        let spec: OpenApiSpec = serde_yaml_ng::from_str(FULL_SPEC_YAML).unwrap();
+        let spec: OpenApiSpec = serde_norway::from_str(FULL_SPEC_YAML).unwrap();
         let json = serde_json::to_string(&spec).unwrap();
         let roundtrip: OpenApiSpec = serde_json::from_str(&json).unwrap();
         let param = &roundtrip.paths["/pets"].get.as_ref().unwrap().parameters[0];
@@ -3151,7 +3151,7 @@ paths:
 
     #[test]
     fn roundtrip_preserves_request_body() {
-        let spec: OpenApiSpec = serde_yaml_ng::from_str(FULL_SPEC_YAML).unwrap();
+        let spec: OpenApiSpec = serde_norway::from_str(FULL_SPEC_YAML).unwrap();
         let json = serde_json::to_string(&spec).unwrap();
         let roundtrip: OpenApiSpec = serde_json::from_str(&json).unwrap();
         let body = roundtrip.paths["/pets"]
@@ -3167,7 +3167,7 @@ paths:
 
     #[test]
     fn roundtrip_preserves_path_level_parameters() {
-        let spec: OpenApiSpec = serde_yaml_ng::from_str(FULL_SPEC_YAML).unwrap();
+        let spec: OpenApiSpec = serde_norway::from_str(FULL_SPEC_YAML).unwrap();
         let json = serde_json::to_string(&spec).unwrap();
         let roundtrip: OpenApiSpec = serde_json::from_str(&json).unwrap();
         let params = &roundtrip.paths["/pets/{petId}"].parameters;
@@ -3203,7 +3203,7 @@ components:
         - $ref: "#/components/schemas/Cat"
         - $ref: "#/components/schemas/Dog"
 "##;
-        let spec: OpenApiSpec = serde_yaml_ng::from_str(yaml).unwrap();
+        let spec: OpenApiSpec = serde_norway::from_str(yaml).unwrap();
         let pet = &spec.components.as_ref().unwrap().schemas["Pet"];
         assert!(pet.is_composed());
         assert_eq!(pet.any_of.len(), 2);
@@ -3245,7 +3245,7 @@ components:
         - $ref: "#/components/schemas/Circle"
         - $ref: "#/components/schemas/Square"
 "##;
-        let spec: OpenApiSpec = serde_yaml_ng::from_str(yaml).unwrap();
+        let spec: OpenApiSpec = serde_norway::from_str(yaml).unwrap();
         let shape = &spec.components.as_ref().unwrap().schemas["Shape"];
         assert!(shape.is_composed());
         assert_eq!(shape.one_of.len(), 2);
@@ -3323,7 +3323,7 @@ components:
       name: JSESSIONID
       description: Session cookie authentication
 "#;
-        let spec: OpenApiSpec = serde_yaml_ng::from_str(yaml).unwrap();
+        let spec: OpenApiSpec = serde_norway::from_str(yaml).unwrap();
         let scheme = &spec.components.as_ref().unwrap().security_schemes["cookieAuth"];
         assert_eq!(scheme.scheme_type, "apiKey");
         assert_eq!(scheme.location.as_deref(), Some("cookie"));
@@ -3387,7 +3387,7 @@ components:
         name:
           type: string
 "##;
-        let spec: OpenApiSpec = serde_yaml_ng::from_str(yaml).unwrap();
+        let spec: OpenApiSpec = serde_norway::from_str(yaml).unwrap();
         let ops: Vec<_> = spec.all_operations().collect();
         assert_eq!(ops.len(), 2);
 

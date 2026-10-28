@@ -1,8 +1,8 @@
 {
   "schema_version": 2,
-  "cargo_lock_sha256": "0b2faac1e1946091ab3e223fb7765168d8113f6cec777f9101fbf261999826ae",
+  "cargo_lock_sha256": "06bd0999f96e88f3eb92d44d3686feb167b1adaf0f3ca45856af6614a513313f",
   "manifest_sha256": {
-    "Cargo.toml": "ebb5cc00cd6946bb5ea86ffd9cd0850381ea1f779a718f2dc0821c10e72c9c2c"
+    "Cargo.toml": "b8355eaf9f4fa513749594e65999a609ed705710fb92bde198e0ec12e6c12958"
   },
   "target_resolves": {
     "base": {
@@ -297,8 +297,8 @@
             "tree": "target"
           },
           {
-            "name": "serde_yaml_ng",
-            "package_key": "serde_yaml_ng-0.10.0",
+            "name": "serde_norway",
+            "package_key": "serde_norway-0.9.42",
             "kind": "normal",
             "features": [],
             "uses_default_features": true,
@@ -458,7 +458,7 @@
           "std"
         ]
       },
-      "serde_yaml_ng-0.10.0": {
+      "serde_norway-0.9.42": {
         "runtime_dependencies": [
           {
             "name": "indexmap",
@@ -501,8 +501,8 @@
             "tree": "target"
           },
           {
-            "name": "unsafe_libyaml",
-            "package_key": "unsafe-libyaml-0.2.11",
+            "name": "unsafe_libyaml_norway",
+            "package_key": "unsafe-libyaml-norway-0.2.15",
             "kind": "normal",
             "features": [],
             "uses_default_features": true,
@@ -670,7 +670,7 @@
         "build_dependencies": [],
         "features": []
       },
-      "unsafe-libyaml-0.2.11": {
+      "unsafe-libyaml-norway-0.2.15": {
         "runtime_dependencies": [],
         "build_dependencies": [],
         "features": []
@@ -1386,7 +1386,7 @@
       "edition": "2021",
       "build_script": "build.rs"
     },
-    "serde_yaml_ng-0.10.0": {
+    "serde_norway-0.9.42": {
       "edition": "2021"
     },
     "syn-3.0.6": {
@@ -1406,7 +1406,7 @@
     "unicode-ident-1.0.26": {
       "edition": "2021"
     },
-    "unsafe-libyaml-0.2.11": {
+    "unsafe-libyaml-norway-0.2.15": {
       "edition": "2021",
       "binaries": [
         {
